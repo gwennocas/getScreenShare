@@ -1,0 +1,17 @@
+{
+  "name": "getscreenshare-token-server",
+  "version": "0.1.0",
+  "description": "Servidor de tokens do getScreenShare",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.8",
+    "livekit-server-sdk": "^2.19.1"
+  },
+  "license": "MIT"
+}

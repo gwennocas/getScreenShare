@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self' wss: https:; worker-src 'self' blob:;" />
+  <title>getScreenShare</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body data-view="lobby">
+
+  <!-- Ícones -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.2"/><circle cx="8" cy="17" r="2.2"/></symbol>
+      <symbol id="i-screen" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></symbol>
+      <symbol id="i-window" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18"/></symbol>
+      <symbol id="i-leave" viewBox="0 0 24 24"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M15 8l4 4-4 4M19 12H9"/></symbol>
+      <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
+      <symbol id="i-volume" viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10H4z"/><path d="M16.5 9a4.2 4.2 0 0 1 0 6"/></symbol>
+      <symbol id="i-volume-off" viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10H4z"/><path d="M17 9.5l4 5M21 9.5l-4 5"/></symbol>
+      <symbol id="i-expand" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+      <symbol id="i-focus" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><rect x="7" y="8" width="10" height="8" rx="1"/></symbol>
+      <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    </defs>
+  </svg>
+
+  <!-- Barra superior (também arrasta a janela) -->
+  <header id="topbar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="#1b2130"/>
+        <g>
+          <rect x="5" y="7" width="3" height="14" fill="#d9dce6"/>
+          <rect x="8" y="7" width="3" height="14" fill="#e6c84a"/>
+          <rect x="11" y="7" width="3" height="14" fill="#4ac2c2"/>
+          <rect x="14" y="7" width="3" height="14" fill="#5cc060"/>
+          <rect x="17" y="7" width="3" height="14" fill="#b85ad6"/>
+          <rect x="20" y="7" width="3" height="14" fill="#e2483c"/>
+          <rect x="23" y="7" width="3" height="14" fill="#3f6fe0"/>
+          <rect x="5" y="23" width="21" height="2" rx="1" fill="#323a4f"/>
+        </g>
+      </svg>
+      <span class="brand-name">getScreenShare</span>
+    </div>
+
+    <div id="room-chip" class="room-chip" hidden>
+      <button id="btn-copy-room" class="chip" type="button" title="Copiar o nome da sala">
+        <span id="room-name"></span>
+        <svg class="i"><use href="#i-copy"/></svg>
+      </button>
+      <div id="conn" class="conn" data-q="unknown" title="Qualidade da conexão">
+        <span class="signal" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span id="conn-text">Conectando</span>
+      </div>
+    </div>
+
+    <div class="spacer"></div>
+    <button id="btn-settings" class="icon-btn" type="button" aria-label="Configurações" title="Configurações">
+      <svg class="i"><use href="#i-sliders"/></svg>
+    </button>
+  </header>
+
+  <!-- Entrada -->
+  <section id="lobby" class="view">
+    <div class="lobby-copy">
+      <h1>Compartilhe sua tela em tempo real</h1>
+      <p class="lead">Entre numa sala, escolha o que mostrar e quem estiver nela assiste com poucos milissegundos de atraso.</p>
+
+      <form id="join-form" autocomplete="off" novalidate>
+        <label class="field">
+          <span>Seu nome</span>
+          <input id="name" type="text" maxlength="40" placeholder="Como os outros vão te ver" />
+        </label>
+        <label class="field">
+          <span>Sala</span>
+          <input id="room" type="text" maxlength="64" placeholder="Nome da sala" />
+          <small>Quem digitar o mesmo nome entra na mesma sala.</small>
+        </label>
+        <p id="lobby-error" class="form-error" role="alert" hidden></p>
+        <button id="btn-join" class="btn primary wide" type="submit">Entrar na sala</button>
+      </form>
+    </div>
+
+    <div class="lobby-art" aria-hidden="true">
+      <div class="monitor">
+        <div class="testcard">
+          <div class="tc-bars"></div>
+          <div class="tc-mid"></div>
+          <div class="tc-low"><i></i><i></i><i></i><b></b></div>
+        </div>
+        <span class="tally"><i></i>ao vivo</span>
+      </div>
+      <div class="monitor-stand"></div>
+    </div>
+  </section>
+
+  <!-- Sala -->
+  <section id="room-view" class="view" hidden>
+    <aside id="people">
+      <div class="side-head">
+        <h2>Na sala</h2>
+        <span id="people-count" class="count">0</span>
+      </div>
+      <ul id="people-list"></ul>
+
+      <section id="own" class="own" hidden>
+        <div class="own-head">
+          <h2>Seu envio</h2>
+          <span class="live-badge"><i></i>ao vivo</span>
+        </div>
+        <dl id="own-stats" class="kv"></dl>
+      </section>
+    </aside>
+
+    <main id="stage">
+      <div id="grid"></div>
+      <div id="empty" class="empty">
+        <div class="monitor small">
+          <div class="testcard">
+            <div class="tc-bars"></div>
+            <div class="tc-mid"></div>
+            <div class="tc-low"><i></i><i></i><i></i><b></b></div>
+          </div>
+        </div>
+        <h2 id="empty-title">Ninguém está compartilhando</h2>
+        <p id="empty-text">Compartilhe sua tela ou espere alguém começar. As telas aparecem aqui.</p>
+      </div>
+    </main>
+
+    <nav id="dock" aria-label="Controles da sala">
+      <button id="btn-share" class="btn primary" type="button">
+        <svg class="i"><use href="#i-screen"/></svg>
+        Compartilhar tela
+      </button>
+      <button id="btn-stop" class="btn danger" type="button" hidden>
+        <svg class="i"><use href="#i-stop"/></svg>
+        Parar de compartilhar
+      </button>
+      <button id="btn-leave" class="btn ghost" type="button">
+        <svg class="i"><use href="#i-leave"/></svg>
+        Sair da sala
+      </button>
+    </nav>
+  </section>
+
+  <div id="audio-sink" hidden></div>
+  <div id="toasts" role="status" aria-live="polite"></div>
+
+  <!-- Escolher o que compartilhar -->
+  <dialog id="picker">
+    <header class="modal-head">
+      <h2>Escolher o que compartilhar</h2>
+      <button id="picker-close" class="icon-btn" type="button" aria-label="Fechar"><svg class="i"><use href="#i-close"/></svg></button>
+    </header>
+
+    <div class="picker-bar">
+      <div class="seg" role="tablist" aria-label="Tipo de fonte">
+        <button type="button" role="tab" id="tab-screen" aria-selected="true" data-kind="screen">Telas</button>
+        <button type="button" role="tab" id="tab-window" aria-selected="false" data-kind="window">Janelas</button>
+      </div>
+      <button id="picker-refresh" class="btn ghost small" type="button">
+        <svg class="i"><use href="#i-refresh"/></svg>
+        Atualizar
+      </button>
+    </div>
+
+    <div id="picker-grid" class="source-grid" role="listbox" aria-label="Fontes disponíveis"></div>
+
+    <div class="picker-opts">
+      <label class="field">
+        <span>Qualidade</span>
+        <select id="pk-quality">
+          <option value="1080p60">1080p 60 fps (cerca de 6 Mbps)</option>
+          <option value="1080p30">1080p 30 fps (cerca de 4 Mbps)</option>
+          <option value="720p60">720p 60 fps (cerca de 3,5 Mbps)</option>
+          <option value="720p30">720p 30 fps (cerca de 2 Mbps)</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Conteúdo</span>
+        <select id="pk-hint">
+          <option value="motion">Jogo ou vídeo (mais fluidez)</option>
+          <option value="detail">Código ou texto (mais nitidez)</option>
+        </select>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="pk-audio" />
+        <span>Compartilhar o áudio do computador</span>
+      </label>
+    </div>
+
+    <footer class="modal-foot">
+      <p id="picker-hint" class="hint">Escolha uma tela ou janela para começar.</p>
+      <button id="picker-cancel" class="btn ghost" type="button">Cancelar</button>
+      <button id="picker-start" class="btn primary" type="button" disabled>Começar a compartilhar</button>
+    </footer>
+  </dialog>
+
+  <!-- Configurações -->
+  <dialog id="settings">
+    <header class="modal-head">
+      <h2>Configurações</h2>
+      <button id="settings-close" class="icon-btn" type="button" aria-label="Fechar"><svg class="i"><use href="#i-close"/></svg></button>
+    </header>
+
+    <div class="settings-body">
+      <section>
+        <h3>Conexão</h3>
+        <label class="field">
+          <span>De onde vem o token da sala</span>
+          <select id="st-mode">
+            <option value="local">Chave neste computador (arquivo .env)</option>
+            <option value="server">Servidor de tokens</option>
+          </select>
+          <small id="st-mode-help"></small>
+        </label>
+        <div id="st-server-fields">
+          <label class="field">
+            <span>Endereço do servidor</span>
+            <input id="st-server-url" type="url" placeholder="https://tokens.seudominio.com" spellcheck="false" />
+          </label>
+          <label class="field">
+            <span>Código de acesso</span>
+            <input id="st-access-code" type="password" autocomplete="off" spellcheck="false" />
+          </label>
+          <div class="inline">
+            <button id="st-check" class="btn ghost small" type="button">Testar servidor</button>
+            <span id="st-check-result" class="hint" role="status"></span>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h3>Transmissão</h3>
+        <label class="field">
+          <span>Codec de vídeo</span>
+          <select id="st-codec">
+            <option value="h264">H.264 (costuma usar a placa de vídeo)</option>
+            <option value="vp8">VP8 (usa o processador)</option>
+            <option value="vp9">VP9 (usa o processador)</option>
+          </select>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="st-simulcast" />
+          <span>Enviar várias qualidades (simulcast)</span>
+        </label>
+        <p class="hint">Ligado, quem tem internet ruim recebe uma versão menor. Desligado, o envio fica mais leve e é mais provável que a placa de vídeo faça a codificação.</p>
+      </section>
+
+      <section>
+        <h3>Exibição</h3>
+        <label class="check">
+          <input type="checkbox" id="st-stats" />
+          <span>Mostrar estatísticas nas telas</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="st-lowlatency" />
+          <span>Reduzir o atraso de reprodução</span>
+        </label>
+        <p class="hint">Segura menos vídeo na memória antes de mostrar. Mais responsivo, mas pode engasgar se a rede oscilar.</p>
+      </section>
+
+      <section>
+        <h3>Diagnóstico</h3>
+        <div class="inline">
+          <button id="st-gpu" class="btn ghost small" type="button">Abrir diagnóstico da GPU</button>
+          <span id="app-version" class="hint"></span>
+        </div>
+        <p class="hint">Na página que abrir, procure por "Video Encode". Se aparecer "Hardware accelerated", a placa de vídeo está disponível para codificar.</p>
+      </section>
+    </div>
+
+    <footer class="modal-foot">
+      <p class="hint">As alterações são salvas automaticamente.</p>
+      <button id="settings-done" class="btn primary" type="button">Concluído</button>
+    </footer>
+  </dialog>
+
+  <script src="../node_modules/livekit-client/dist/livekit-client.umd.js"></script>
+  <script src="js/settings.js"></script>
+  <script src="js/stats.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
