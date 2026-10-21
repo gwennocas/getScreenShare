@@ -216,14 +216,7 @@
     <div id="settings-pane-general" class="settings-body" role="tabpanel" aria-labelledby="settings-tab-general">
       <section>
         <h3>Conexão</h3>
-        <label class="field">
-          <span>De onde vem o token da sala</span>
-          <select id="st-mode">
-            <option value="local">Chave neste computador (arquivo .env)</option>
-            <option value="server">Servidor de tokens</option>
-          </select>
-          <small id="st-mode-help"></small>
-        </label>
+        <p class="hint">Informe o servidor de tokens e o código de acesso fornecidos por quem hospeda a sala. Você também pode usar seu próprio servidor.</p>
         <div id="st-server-fields">
           <label class="field">
             <span>Endereço do servidor</span>
@@ -276,7 +269,8 @@
           <button id="st-gpu" class="btn ghost small" type="button">Abrir diagnóstico da GPU</button>
           <span id="app-version" class="hint"></span>
         </div>
-        <p class="hint">Na página que abrir, procure por "Video Encode". Se aparecer "Hardware accelerated", a placa de vídeo está disponível para codificar.</p>
+        <p id="st-gpu-status" class="hint" role="status">Consultando a codificação de vídeo…</p>
+        <p class="hint">A disponibilidade da GPU não garante seu uso na transmissão. O painel "Seu envio" mostra o encoder escolhido para a tela compartilhada.</p>
       </section>
     </div>
 

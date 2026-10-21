@@ -6,24 +6,24 @@ Cada pessoa entra numa sala pelo nome, escolhe uma tela ou janela e todos na sal
 ## Rodar durante o desenvolvimento (Windows)
 
 1. Instale o Node.js (versão LTS) em https://nodejs.org
-2. Crie uma conta grátis no LiveKit Cloud (https://cloud.livekit.io), crie um projeto e copie a URL (`wss://...`), a API Key e o API Secret (Settings, Keys).
+2. Para hospedar seu próprio servidor, crie um projeto no LiveKit Cloud (https://cloud.livekit.io) e obtenha a URL (`wss://...`), a API Key e o API Secret. Quem usa um servidor existente não precisa dessas credenciais.
 3. Abra um terminal nesta pasta e rode `npm install`.
-4. Copie `.env.example` para `.env` e cole os três dados do LiveKit.
-5. Rode `npm start`.
+4. Configure um servidor de tokens conforme as instruções abaixo, ou obtenha a URL e o código de acesso de quem já hospeda um.
+5. Rode `npm start` e informe a URL e o código em **Configurações → Geral → Conexão**.
 
 Para testar sozinha, abra duas janelas do app (dois terminais com `npm start`), entre na mesma sala nas duas e compartilhe numa delas. Deixe "Compartilhar o áudio do computador" desmarcado nesse teste, senão o som volta em loop.
 
 ## Usar com amigos: servidor de tokens
 
-Para entrar numa sala, o app precisa de um token assinado com a chave secreta do LiveKit. Com o arquivo `.env`, essa chave fica no seu computador. Isso serve para testar, mas não dá para entregar o app a outras pessoas desse jeito.
+O aplicativo usa exclusivamente um servidor de tokens. As credenciais do LiveKit ficam no servidor; o app não lê arquivos `.env` nem gera tokens localmente.
 
-A pasta `server/` tem um servidor pequeno que guarda a chave e entrega os tokens. Quem usa o app só precisa do endereço do servidor e de um código de acesso.
+A pasta `server/` tem um servidor pequeno que guarda a chave e entrega os tokens. Quem usa o app só precisa do endereço do servidor e de um código de acesso. Para hospedar outra instância no Render, clone ou faça um fork deste repositório, publique com suas próprias credenciais e configure a nova URL no app. Todos que usam essa instância compartilham o mesmo endereço de servidor.
 
 1. Entre em `server/`, copie `.env.example` para `.env` e preencha os dados do LiveKit e o `ACCESS_CODE`.
 2. Rode `npm install` e `npm start` (porta 8787 por padrão). Teste abrindo `http://localhost:8787/health`.
 3. Para publicar no Render, este projeto inclui `render.yaml`. Envie o conteúdo desta pasta para um repositório GitHub; no Render, escolha **New + → Blueprint**, conecte o repositório e informe as variáveis secretas solicitadas. A configuração aponta para `server/`, usa `npm ci` e `npm start`, configura `/health` como health check e ativa `TRUST_PROXY=1`. Alternativamente, crie um Web Service manualmente com Root Directory `server`, Build Command `npm ci`, Start Command `npm start` e Health Check Path `/health`.
 4. Depois do deploy, teste `https://SEU-SERVICO.onrender.com/health`. A resposta deve ser `{"ok":true}`.
-5. No app, abra Configurações, escolha "Servidor de tokens", cole somente a URL base do serviço (por exemplo, `https://SEU-SERVICO.onrender.com`, sem `/token`) e o mesmo código definido em `ACCESS_CODE`, e clique em "Testar servidor".
+5. No app, abra **Configurações → Geral → Conexão**, cole somente a URL base do serviço (por exemplo, `https://SEU-SERVICO.onrender.com`, sem `/token`) e o mesmo código definido em `ACCESS_CODE`, e clique em "Testar servidor".
 
 Defina `LIVEKIT_URL`, `LIVEKIT_API_KEY` e `LIVEKIT_API_SECRET` com as credenciais do seu projeto no LiveKit Cloud, além de um `ACCESS_CODE` longo e difícil de adivinhar. O servidor se recusa a iniciar se `ACCESS_CODE` estiver ausente. Nunca coloque o API Secret no repositório GitHub nem no app dos seus amigos. O servidor limita 30 pedidos por minuto por endereço e só aceita nomes de sala simples.
 
@@ -31,7 +31,7 @@ Defina `LIVEKIT_URL`, `LIVEKIT_API_KEY` e `LIVEKIT_API_SECRET` com as credenciai
 
 ## Gerar o instalador
 
-No Windows, rode `npm run dist`. O instalador aparece na pasta `dist/`. A versão instalada lê o `.env` da pasta de dados do app (`%APPDATA%\getScreenShare\.env`), mas o jeito recomendado é usar o servidor de tokens.
+No Windows, rode `npm run dist`. O instalador aparece na pasta `dist/`. Depois de instalar, configure a URL do servidor de tokens e o código de acesso. Nenhum arquivo `.env` é necessário no computador de quem usa o app.
 
 ### Atualizar o app
 
@@ -57,7 +57,7 @@ Em cada tela recebida, o botão de informação alterna entre resumo, detalhes c
 - Encoder: o nome da implementação em uso (por exemplo, `OpenH264` é por software).
 - Limite: o que está segurando a qualidade (processador ou internet).
 
-Se aparecer "processador", teste desligar o simulcast nas configurações e compartilhar de novo. O botão "Abrir diagnóstico da GPU" abre a página interna `chrome://gpu`; procure por "Video Encode". Se a placa de vídeo aparece como disponível lá, mas o envio continua por processador, o motivo está na combinação de codec, simulcast e driver, e vale comparar os resultados.
+Se aparecer "processador", teste desligar o simulcast nas configurações e compartilhar de novo. O app habilita no Windows a opção experimental `MediaFoundationH264CbpEncoding` para permitir o encoder por hardware com H.264 Constrained Baseline. O Chromium ainda pode usar `OpenH264` se a GPU ou o driver não oferecerem um encoder compatível. Em Configurações, o estado de `Video Encode` mostra a disponibilidade geral da GPU; o painel "Seu envio" mostra o encoder realmente usado. "Abrir diagnóstico da GPU" exibe os detalhes de `chrome://gpu`.
 
 ## Estrutura
 

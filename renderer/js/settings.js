@@ -11,7 +11,6 @@ const QUALITY = {
 const DEFAULT_SETTINGS = {
   name: '',
   room: '',
-  tokenMode: 'local',   // 'local' (.env) ou 'server' (servidor de tokens)
   serverUrl: '',
   accessCode: '',
   codec: 'h264',
@@ -30,6 +29,8 @@ function loadSettings() {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw) currentSettings = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
   } catch (_) { /* sem armazenamento: usa os padrões */ }
+  // Descarta o modo de autenticação antigo, preservando URL e preferências.
+  delete currentSettings.tokenMode;
   if (!QUALITY[currentSettings.quality]) currentSettings.quality = DEFAULT_SETTINGS.quality;
   return currentSettings;
 }

@@ -21,11 +21,11 @@ const els = {
   pickerStart: $('picker-start'), pickerCancel: $('picker-cancel'), pickerClose:$('picker-close'),
   pickerRefresh: $('picker-refresh'), tabScreen: $('tab-screen'), tabWindow:$('tab-window'),
   pkQuality: $('pk-quality'), pkHint: $('pk-hint'), pkAudio:$('pk-audio'),
-  settings: $('settings'), stMode: $('st-mode'), stModeHelp:$('st-mode-help'),
-  stServerFields: $('st-server-fields'), stServerUrl: $('st-server-url'), stAccessCode:$('st-access-code'),
+  settings: $('settings'),
+  stServerUrl: $('st-server-url'), stAccessCode:$('st-access-code'),
   stCheck: $('st-check'), stCheckResult:$('st-check-result'),
   stCodec: $('st-codec'), stSimulcast:$('st-simulcast'), stStats: $('st-stats'), stLowLatency:$('st-lowlatency'),
-  stGpu: $('st-gpu'), appVersion:$('app-version'),
+  stGpu: $('st-gpu'), stGpuStatus:$('st-gpu-status'), appVersion:$('app-version'),
   settingsTabGeneral: $('settings-tab-general'), settingsTabUpdates: $('settings-tab-updates'),
   settingsPaneGeneral: $('settings-pane-general'), settingsPaneUpdates: $('settings-pane-updates'),
   stUpdateVersion: $('st-update-version'), stUpdateCheck: $('st-update-check'),
@@ -176,7 +176,6 @@ async function joinRoom(event) {
   try {
     const identity = `${name.replace(/[^\p{L}\p{N}_-]/gu, '').slice(0, 24) || 'user'}-${Math.random().toString(36).slice(2, 7)}`;
     const { token, url } = await window.api.getToken({
-      mode: s.tokenMode,
       serverUrl: s.serverUrl,
       accessCode: s.accessCode,
       room: roomName,
@@ -775,7 +774,6 @@ function renderUpdaterStatus(state) {
 
 function fillSettings() {
   const s = getSettings();
-  els.stMode.value = s.tokenMode;
   els.stServerUrl.value = s.serverUrl;
   els.stAccessCode.value = s.accessCode;
   els.stCodec.value = s.codec;
@@ -783,21 +781,32 @@ function fillSettings() {
   els.stStats.checked = s.showStats;
   els.stLowLatency.checked = s.lowLatency;
   els.stCheckResult.textContent = '';
-  refreshModeUi();
-}
-
-function refreshModeUi() {
-  const server = els.stMode.value === 'server';
-  els.stServerFields.hidden = !server;
-  els.stModeHelp.textContent = server
-    ? 'Um servidor seu guarda a chave e entrega o token. É o jeito certo de usar com amigos.'
-    : 'Usa as chaves do arquivo .env deste computador. Serve para testar sozinha.';
 }
 
 function openSettings() {
   fillSettings();
   setSettingsTab('general');
   els.settings.showModal();
+  refreshGpuStatus();
+}
+
+async function refreshGpuStatus() {
+  els.stGpuStatus.textContent = 'Consultando a codificação de vídeo…';
+  try {
+    const gpu = await window.api.getGpuStatus();
+    const enabled = ['enabled', 'enabled_on', 'enabled_force', 'enabled_force_on', 'enabled_readback'].includes(gpu.videoEncode);
+    if (!gpu.hardwareAcceleration) {
+      els.stGpuStatus.textContent = 'Aceleração gráfica desativada neste dispositivo. Abra o diagnóstico para mais detalhes.';
+    } else if (enabled) {
+      els.stGpuStatus.textContent = 'Video Encode disponível no Chromium. Confira o encoder em "Seu envio" durante a transmissão.';
+    } else if (gpu.videoEncode === 'unknown') {
+      els.stGpuStatus.textContent = 'O Chromium não informou o estado de Video Encode. Abra o diagnóstico para mais detalhes.';
+    } else {
+      els.stGpuStatus.textContent = `Video Encode indisponível no Chromium (${gpu.videoEncode}). Abra o diagnóstico para mais detalhes.`;
+    }
+  } catch (_) {
+    els.stGpuStatus.textContent = 'Não foi possível consultar a GPU. Abra o diagnóstico para mais detalhes.';
+  }
 }
 
 function setSettingsTab(tab) {
@@ -824,7 +833,6 @@ async function checkServer() {
 function bindSettings() {
   els.settingsTabGeneral.addEventListener('click', () => setSettingsTab('general'));
   els.settingsTabUpdates.addEventListener('click', () => setSettingsTab('updates'));
-  els.stMode.addEventListener('change', () => { saveSettings({ tokenMode: els.stMode.value }); refreshModeUi(); });
   els.stServerUrl.addEventListener('input', () => saveSettings({ serverUrl: els.stServerUrl.value.trim() }));
   els.stAccessCode.addEventListener('input', () => saveSettings({ accessCode: els.stAccessCode.value }));
   els.stCodec.addEventListener('change', () => saveSettings({ codec: els.stCodec.value }));

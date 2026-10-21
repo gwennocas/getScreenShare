@@ -12,11 +12,9 @@
     "release": "electron-builder --win --publish always"
   },
   "dependencies": {
-    "dotenv": "^18.0.8",
+    "electron-updater": "^6.8.9",
     "livekit-client": "^2.23.0",
-    "livekit-server-sdk": "^2.19.1",
-    "wasapi-loopback": "github:thomas-quant/wasapi-loopback#main",
-    "electron-updater": "^6.8.9"
+    "wasapi-loopback": "github:thomas-quant/wasapi-loopback#main"
   },
   "devDependencies": {
     "electron": "^44.8.0",

@@ -3,31 +3,20 @@ const path = require('path');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const execFileAsync = promisify(execFile);
-const dotenv = require('dotenv');
 const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell } = require('electron');
 const tokens = require('./token');
 const { autoUpdater } = require('electron-updater');
 
-// --- FORÇAR ACELERAÇÃO DE HARDWARE E DESCARTAR SANDBOX DE GPU ---
-app.commandLine.appendSwitch('enable-hardware-accelerated-video-encode');
-app.commandLine.appendSwitch('enable-gpu-rasterization');
-app.commandLine.appendSwitch('enable-zero-copy');
-app.commandLine.appendSwitch('ignore-gpu-blocklist');
-app.commandLine.appendSwitch('use-angle', 'd3d11');
-app.commandLine.appendSwitch('disable-software-rasterizer');
-app.commandLine.appendSwitch('disable-direct-composition');
-
-// Novas flags para permitir que o Encoder de Hardware aceda ao sistema:
-app.commandLine.appendSwitch('disable-gpu-sandbox');
-app.commandLine.appendSwitch('enable-features', 'WebRTCH264HardwareSupport');
-app.commandLine.appendSwitch('enable-gpu-memory-buffer-video-frames');
+// O WebRTC costuma negociar H.264 Constrained Baseline. No Windows, o Chromium
+// mantém a codificação dessa variante por Media Foundation desativada por padrão.
+// O driver ainda precisa oferecer um encoder compatível; o WebRTC pode recair
+// para OpenH264 caso a inicialização do encoder por hardware falhe.
+if (process.platform === 'win32') {
+  app.commandLine.appendSwitch('enable-features', 'MediaFoundationH264CbpEncoding');
+}
 
 app.setName('getScreenShare');
 if (process.platform === 'win32') app.setAppUserModelId('com.getscreenshare.app');
-
-// Lê o .env da pasta de dados do app (versão instalada) e depois da pasta do projeto (npm start).
-dotenv.config({ path: path.join(app.getPath('userData'), '.env'), quiet: true });
-dotenv.config({ quiet: true });
 
 const BG = '#151a24';
 let win;
@@ -303,11 +292,8 @@ ipcMain.handle('stop-excluded-audio', () => {
 });
 
 ipcMain.handle('get-token', async (_event, params) => {
-  const { mode, room, identity, name, serverUrl, accessCode } = params || {};
-  if (mode === 'server') {
-    return tokens.fromServer({ room, identity, name, serverUrl, accessCode });
-  }
-  return tokens.fromEnv({ room, identity, name });
+  const { room, identity, name, serverUrl, accessCode } = params || {};
+  return tokens.fromServer({ room, identity, name, serverUrl, accessCode });
 });
 
 ipcMain.handle('check-server', async (_event, serverUrl) => tokens.checkServer(serverUrl));
@@ -327,6 +313,14 @@ ipcMain.handle('open-gpu-diagnostics', () => {
   const w = new BrowserWindow({ width: 1000, height: 800, title: 'Diagnóstico da GPU', autoHideMenuBar: true });
   w.loadURL('chrome://gpu');
   return true;
+});
+
+ipcMain.handle('get-gpu-status', async () => {
+  try { await app.getGPUInfo('basic'); } catch (_) { /* GPU pode estar indisponível */ }
+  return {
+    hardwareAcceleration: app.isHardwareAccelerationEnabled(),
+    videoEncode: app.getGPUFeatureStatus().video_encode || 'unknown',
+  };
 });
 
 ipcMain.handle('get-app-info', () => ({ version: app.getVersion() }));

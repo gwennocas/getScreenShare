@@ -1,7 +1,5 @@
-// Gera (ou busca) o token de acesso à sala do LiveKit.
+// Busca o token de acesso à sala no servidor configurado.
 // Fica separado do main.js pra poder ser testado sem abrir o Electron.
-const { AccessToken } = require('livekit-server-sdk');
-
 const ROOM_RE = /^[\p{L}\p{N}_\- ]{1,64}$/u;
 
 function checkInput({ room, identity, name }) {
@@ -14,24 +12,6 @@ function checkInput({ room, identity, name }) {
   if (name != null && (typeof name !== 'string' || name.length > 40)) {
     throw new Error('Nome inválido (máximo de 40 caracteres).');
   }
-}
-
-// Modo 1: a chave secreta está neste computador (arquivo .env). Bom pra testar.
-async function fromEnv({ room, identity, name }, env = process.env) {
-  checkInput({ room, identity, name });
-  const { LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET } = env;
-  if (!LIVEKIT_URL || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
-    throw new Error(
-      'Faltam dados do LiveKit. Preencha LIVEKIT_URL, LIVEKIT_API_KEY e LIVEKIT_API_SECRET no arquivo .env, ou use um servidor de tokens nas configurações.'
-    );
-  }
-  const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
-    identity,
-    name: name || identity,
-    ttl: '2h',
-  });
-  at.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true });
-  return { token: await at.toJwt(), url: LIVEKIT_URL };
 }
 
 function normalizeServerUrl(raw) {
@@ -58,7 +38,7 @@ async function request(url, options) {
   }
 }
 
-// Modo 2: um servidor seu (pasta server/) guarda a chave e entrega o token.
+// O servidor (pasta server/) guarda a chave e entrega o token.
 async function fromServer({ room, identity, name, serverUrl, accessCode }) {
   checkInput({ room, identity, name });
   const base = normalizeServerUrl(serverUrl);
@@ -86,4 +66,4 @@ async function checkServer(serverUrl) {
   return true;
 }
 
-module.exports = { fromEnv, fromServer, checkServer, normalizeServerUrl };
+module.exports = { fromServer, checkServer, normalizeServerUrl };

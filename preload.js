@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('api', {
   getToken: (params) => ipcRenderer.invoke('get-token', params),
   checkServer: (serverUrl) => ipcRenderer.invoke('check-server', serverUrl),
   openGpuDiagnostics: () => ipcRenderer.invoke('open-gpu-diagnostics'),
+  getGpuStatus: () => ipcRenderer.invoke('get-gpu-status'),
   getAppInfo: () => ipcRenderer.invoke('get-app-info'),
   getUpdaterStatus: () => ipcRenderer.invoke('updater:get-status'),
   checkForUpdates: () => ipcRenderer.invoke('updater:check'),
