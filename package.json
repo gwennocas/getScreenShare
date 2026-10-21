@@ -1,6 +1,6 @@
 {
   "name": "getscreenshare",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Compartilhamento de tela em tempo real (Electron + LiveKit)",
   "main": "main.js",
   "author": "getScreenShare",
@@ -8,12 +8,15 @@
   "scripts": {
     "start": "electron .",
     "server": "node server/index.js",
-    "dist": "electron-builder --win"
+    "dist": "electron-builder --win",
+    "release": "electron-builder --win --publish always"
   },
   "dependencies": {
     "dotenv": "^18.0.8",
     "livekit-client": "^2.23.0",
-    "livekit-server-sdk": "^2.19.1"
+    "livekit-server-sdk": "^2.19.1",
+    "wasapi-loopback": "github:thomas-quant/wasapi-loopback#main",
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
     "electron": "^44.8.0",
@@ -32,7 +35,8 @@
       "token.js",
       "renderer/**/*",
       "build/icon.png",
-      "package.json"
+      "package.json",
+      "node_modules/wasapi-loopback/**/*"
     ],
     "win": {
       "target": "nsis",
@@ -42,6 +46,17 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "shortcutName": "getScreenShare"
-    }
+    },
+    "asarUnpack": [
+      "node_modules/wasapi-loopback/**/*.node"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "gwennocas",
+        "repo": "getScreenShare",
+        "releaseType": "release"
+      }
+    ]
   }
 }

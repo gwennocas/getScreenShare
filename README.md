@@ -33,6 +33,16 @@ Defina `LIVEKIT_URL`, `LIVEKIT_API_KEY` e `LIVEKIT_API_SECRET` com as credenciai
 
 No Windows, rode `npm run dist`. O instalador aparece na pasta `dist/`. A versão instalada lê o `.env` da pasta de dados do app (`%APPDATA%\getScreenShare\.env`), mas o jeito recomendado é usar o servidor de tokens.
 
+### Atualizar o app
+
+No app instalado, abra **Configurações → Atualizações** e toque em **Verificar atualizações**. Se houver uma versão nova, toque em **Baixar atualização**. Quando o download terminar, toque em **Reiniciar e instalar**. O app também verifica atualizações ao abrir, mas só baixa e instala depois desses cliques.
+
+Para publicar uma versão, atualize o campo `version` em `package.json`, configure `GH_TOKEN` com permissão de escrita no repositório e rode `npm run release` no Windows. O comando gera o instalador e publica os arquivos necessários em uma GitHub Release. A versão `0.2.1` deste projeto contém o atualizador; ela ainda precisa ser publicada. Quem usa uma versão anterior precisa instalar manualmente uma versão com o atualizador uma vez.
+
+### Áudio sem o Discord
+
+Ao marcar **Compartilhar o áudio do computador**, o app captura os sons do sistema pelo WASAPI, excluindo o Discord e seus processos filhos. O recurso exige Windows x64, Discord aberto e Windows 10 versão 2004 ou mais recente. Se a captura filtrada não iniciar, a tela continua sendo compartilhada sem áudio.
+
 ## Onde mexer na responsividade
 
 - Configurações do app: codec (H.264, VP8, VP9), simulcast, reduzir atraso de reprodução.

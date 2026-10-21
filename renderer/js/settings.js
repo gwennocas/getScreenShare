@@ -8,7 +8,6 @@ const QUALITY = {
   '720p60':  { width: 1280, height: 720,  fps: 60, bitrate: 3_500_000 },
   '720p30':  { width: 1280, height: 720,  fps: 30, bitrate: 2_000_000 },
 };
-
 const DEFAULT_SETTINGS = {
   name: '',
   room: '',

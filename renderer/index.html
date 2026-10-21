@@ -208,7 +208,12 @@
       <button id="settings-close" class="icon-btn" type="button" aria-label="Fechar"><svg class="i"><use href="#i-close"/></svg></button>
     </header>
 
-    <div class="settings-body">
+    <nav class="settings-tabs" role="tablist" aria-label="Seções das configurações">
+      <button id="settings-tab-general" class="settings-tab" type="button" role="tab" aria-selected="true" aria-controls="settings-pane-general">Geral</button>
+      <button id="settings-tab-updates" class="settings-tab" type="button" role="tab" aria-selected="false" aria-controls="settings-pane-updates">Atualizações</button>
+    </nav>
+
+    <div id="settings-pane-general" class="settings-body" role="tabpanel" aria-labelledby="settings-tab-general">
       <section>
         <h3>Conexão</h3>
         <label class="field">
@@ -272,6 +277,18 @@
           <span id="app-version" class="hint"></span>
         </div>
         <p class="hint">Na página que abrir, procure por "Video Encode". Se aparecer "Hardware accelerated", a placa de vídeo está disponível para codificar.</p>
+      </section>
+    </div>
+
+    <div id="settings-pane-updates" class="settings-body" role="tabpanel" aria-labelledby="settings-tab-updates" hidden>
+      <section>
+        <h3>Atualizações</h3>
+        <p id="st-update-version" class="hint">Versão instalada: verificando…</p>
+        <div class="inline">
+          <button id="st-update-check" class="btn ghost small" type="button">Verificar atualizações</button>
+          <button id="st-update-action" class="btn primary small" type="button" hidden>Baixar atualização</button>
+        </div>
+        <p id="st-update-status" class="hint" role="status" aria-live="polite">O aplicativo procura atualizações ao iniciar. A instalação sempre exige sua confirmação.</p>
       </section>
     </div>
 

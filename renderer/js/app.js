@@ -8,25 +8,29 @@ const ROOM_RE = /^[\p{L}\p{N}_\- ]{1,64}$/u;
 const AVATAR_COLORS = ['#e6c84a', '#4ac2c2', '#5cc060', '#c985e3', '#7da2f0'];
 
 const els = {
-  lobby: $('lobby'), roomView: $('room-view'), roomChip: $('room-chip'),
-  roomName: $('room-name'), copyRoom: $('btn-copy-room'),
-  conn: $('conn'), connText: $('conn-text'),
-  form: $('join-form'), name: $('name'), room: $('room'), lobbyError: $('lobby-error'), join: $('btn-join'),
-  peopleList: $('people-list'), peopleCount: $('people-count'),
-  own: $('own'), ownStats: $('own-stats'),
-  grid: $('grid'), empty: $('empty'), emptyTitle: $('empty-title'), emptyText: $('empty-text'),
-  share: $('btn-share'), stop: $('btn-stop'), leave: $('btn-leave'),
-  audioSink: $('audio-sink'), toasts: $('toasts'), settingsBtn: $('btn-settings'),
-  picker: $('picker'), pickerGrid: $('picker-grid'), pickerHint: $('picker-hint'),
-  pickerStart: $('picker-start'), pickerCancel: $('picker-cancel'), pickerClose: $('picker-close'),
-  pickerRefresh: $('picker-refresh'), tabScreen: $('tab-screen'), tabWindow: $('tab-window'),
-  pkQuality: $('pk-quality'), pkHint: $('pk-hint'), pkAudio: $('pk-audio'),
-  settings: $('settings'), stMode: $('st-mode'), stModeHelp: $('st-mode-help'),
-  stServerFields: $('st-server-fields'), stServerUrl: $('st-server-url'), stAccessCode: $('st-access-code'),
-  stCheck: $('st-check'), stCheckResult: $('st-check-result'),
-  stCodec: $('st-codec'), stSimulcast: $('st-simulcast'), stStats: $('st-stats'), stLowLatency: $('st-lowlatency'),
-  stGpu: $('st-gpu'), appVersion: $('app-version'),
-  settingsClose: $('settings-close'), settingsDone: $('settings-done'),
+  lobby: $('lobby'), roomView: $('room-view'), roomChip:$('room-chip'),
+  roomName: $('room-name'), copyRoom:$('btn-copy-room'),
+  conn: $('conn'), connText:$('conn-text'),
+  form: $('join-form'), name: $('name'), room:$('room'), lobbyError: $('lobby-error'), join:$('btn-join'),
+  peopleList: $('people-list'), peopleCount:$('people-count'),
+  own: $('own'), ownStats:$('own-stats'),
+  grid: $('grid'), empty:$('empty'), emptyTitle: $('empty-title'), emptyText:$('empty-text'),
+  share: $('btn-share'), stop: $('btn-stop'), leave:$('btn-leave'),
+  audioSink: $('audio-sink'), toasts: $('toasts'), settingsBtn:$('btn-settings'),
+  picker: $('picker'), pickerGrid: $('picker-grid'), pickerHint:$('picker-hint'),
+  pickerStart: $('picker-start'), pickerCancel: $('picker-cancel'), pickerClose:$('picker-close'),
+  pickerRefresh: $('picker-refresh'), tabScreen: $('tab-screen'), tabWindow:$('tab-window'),
+  pkQuality: $('pk-quality'), pkHint: $('pk-hint'), pkAudio:$('pk-audio'),
+  settings: $('settings'), stMode: $('st-mode'), stModeHelp:$('st-mode-help'),
+  stServerFields: $('st-server-fields'), stServerUrl: $('st-server-url'), stAccessCode:$('st-access-code'),
+  stCheck: $('st-check'), stCheckResult:$('st-check-result'),
+  stCodec: $('st-codec'), stSimulcast:$('st-simulcast'), stStats: $('st-stats'), stLowLatency:$('st-lowlatency'),
+  stGpu: $('st-gpu'), appVersion:$('app-version'),
+  settingsTabGeneral: $('settings-tab-general'), settingsTabUpdates: $('settings-tab-updates'),
+  settingsPaneGeneral: $('settings-pane-general'), settingsPaneUpdates: $('settings-pane-updates'),
+  stUpdateVersion: $('st-update-version'), stUpdateCheck: $('st-update-check'),
+  stUpdateAction: $('st-update-action'), stUpdateStatus: $('st-update-status'),
+  settingsClose: $('settings-close'), settingsDone:$('settings-done'),
 };
 
 let room = null;
@@ -37,6 +41,9 @@ let localShareTrack = null;
 let pickedSourceId = null;
 let pickerKind = 'screen';
 let pickerSources = [];
+let excludedAudioContext = null;
+let excludedAudioNode = null;
+let excludedAudioTrack = null;
 
 const tiles = new Map();       // identity -> { el, video, track, stop, statsEl }
 const audioByPeer = new Map(); // identity -> { els: [], volume, muted }
@@ -204,11 +211,13 @@ async function joinRoom(event) {
 async function leaveRoom() {
   if (!room) return;
   leaving = true;
+  await stopExcludedAudioTrack();
   try { await room.disconnect(); } catch (_) { /* ignora */ }
   // o evento Disconnected faz a limpeza
 }
 
 function cleanupRoom() {
+  void stopExcludedAudioTrack();
   if (stopOwnStats) { stopOwnStats(); stopOwnStats = null; }
   localShareTrack = null;
   [...tiles.keys()].forEach(removeTile);
@@ -574,6 +583,82 @@ function renderSources() {
   els.pickerHint.textContent = picked ? `Escolhido: ${picked.name}` : 'Escolha uma tela ou janela para começar.';
 }
 
+
+// Recebe PCM float32 estéreo (48 kHz) do WASAPI, monta um MediaStreamTrack e
+// publica-o como ScreenShareAudio no LiveKit. A captura já vem com o Discord excluído.
+async function startExcludedAudioTrack() {
+  if (!room) throw new Error('Você não está conectado à sala.');
+  await stopExcludedAudioTrack();
+
+  const context = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
+  let node = null;
+  let track = null;
+  try {
+    await context.audioWorklet.addModule('./js/pcm-audio-worklet.js');
+    node = new AudioWorkletNode(context, 'pcm-stream-processor', {
+      numberOfInputs: 0,
+      numberOfOutputs: 1,
+      outputChannelCount: [2],
+    });
+    const destination = context.createMediaStreamDestination();
+    node.connect(destination);
+
+    window.api.onExcludedAudioChunk((data) => {
+      if (!node) return;
+      let buffer;
+      if (data instanceof ArrayBuffer) {
+        buffer = data;
+      } else if (ArrayBuffer.isView(data)) {
+        buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+      } else {
+        return;
+      }
+      try { node.port.postMessage(buffer, [buffer]); } catch (_) { /* descarta bloco inválido/atrasado */ }
+    });
+
+    await context.resume();
+    await window.api.startExcludedAudio();
+    track = destination.stream.getAudioTracks()[0];
+    if (!track) throw new Error('Não foi possível criar a faixa de áudio filtrado.');
+    await room.localParticipant.publishTrack(track, { source: Track.Source.ScreenShareAudio });
+
+    excludedAudioContext = context;
+    excludedAudioNode = node;
+    excludedAudioTrack = track;
+  } catch (err) {
+    window.api.removeExcludedAudioChunkListener();
+    try { await window.api.stopExcludedAudio(); } catch (_) { /* captura pode não ter iniciado */ }
+    if (track) { try { track.stop(); } catch (_) { /* ignora */ } }
+    if (context.state !== 'closed') { try { await context.close(); } catch (_) { /* ignora */ } }
+    throw err;
+  }
+}
+
+async function stopExcludedAudioTrack() {
+  // Zera o estado antes do primeiro await para tornar chamadas simultâneas idempotentes.
+  const track = excludedAudioTrack;
+  const context = excludedAudioContext;
+  excludedAudioTrack = null;
+  excludedAudioContext = null;
+  excludedAudioNode = null;
+
+  if (window.api && window.api.removeExcludedAudioChunkListener) {
+    window.api.removeExcludedAudioChunkListener();
+  }
+  if (window.api && window.api.stopExcludedAudio) {
+    try { await window.api.stopExcludedAudio(); } catch (_) { /* pode já estar parado */ }
+  }
+  if (track) {
+    if (room) {
+      try { await room.localParticipant.unpublishTrack(track, false); } catch (_) { /* pode já ter sido removida */ }
+    }
+    try { track.stop(); } catch (_) { /* ignora */ }
+  }
+  if (context && context.state !== 'closed') {
+    try { await context.close(); } catch (_) { /* ignora */ }
+  }
+}
+
 async function startShare() {
   if (!room || !pickedSourceId) return;
   const s = getSettings();
@@ -584,11 +669,13 @@ async function startShare() {
 
   els.pickerStart.disabled = true;
   try {
-    await window.api.selectSource(pickedSourceId, withAudio);
+    await window.api.selectSource(pickedSourceId, false);
+
+    // Configuração de compartilhamento de tela com suporte otimizado para GPU/Hardware
     const pub = await room.localParticipant.setScreenShareEnabled(
       true,
       {
-        audio: withAudio,
+        audio: false, // o áudio é publicado separadamente, após excluir o processo do Discord
         contentHint: hint, // 'motion' = fluidez, 'detail' = nitidez
         resolution: { width: q.width, height: q.height, frameRate: q.fps },
       },
@@ -600,6 +687,15 @@ async function startShare() {
         degradationPreference: 'maintain-framerate',
       }
     );
+    let audioError = '';
+    if (withAudio) {
+      try {
+        await startExcludedAudioTrack();
+      } catch (err) {
+        console.error('Áudio filtrado do Discord desativado:', err);
+        audioError = friendlyError(err);
+      }
+    }
     saveSettings({ quality: qualityKey, hint, shareAudio: withAudio });
     els.picker.close();
 
@@ -614,7 +710,9 @@ async function startShare() {
     els.stop.hidden = false;
     updateGrid();
     renderPeople();
-    toast('Você está compartilhando a tela', { kind: 'ok' });
+    toast(audioError
+      ? `Tela compartilhada; áudio desativado para evitar loopback. ${audioError}`
+      : 'Você está compartilhando a tela', { kind: audioError ? 'warn' : 'ok' });
   } catch (err) {
     console.error(err);
     toast(`Não foi possível compartilhar. ${friendlyError(err)}`, { kind: 'error' });
@@ -630,12 +728,47 @@ async function stopShare() {
 }
 
 function onShareEnded() {
+  void stopExcludedAudioTrack();
   if (stopOwnStats) { stopOwnStats(); stopOwnStats = null; }
   localShareTrack = null;
   els.own.hidden = true;
   els.share.hidden = false;
   els.stop.hidden = true;
   updateGrid();
+}
+
+// ---------- Atualizações ----------
+
+let updaterUiState = { status: 'idle' };
+
+function renderUpdaterStatus(state) {
+  if (!state || typeof state.status !== 'string') return;
+  updaterUiState = state;
+
+  if (els.stUpdateVersion) {
+    els.stUpdateVersion.textContent = 'Versão instalada: ' + (state.currentVersion || 'desconhecida');
+  }
+
+  const messages = {
+    idle: 'O aplicativo procura atualizações ao iniciar. Você também pode verificar manualmente.',
+    checking: 'Procurando atualizações…',
+    available: 'A versão ' + (state.version || 'nova') + ' está disponível. Clique em “Baixar atualização” quando quiser.',
+    downloading: 'Baixando atualização… ' + (state.percent || 0) + '%',
+    downloaded: 'A versão ' + (state.version || 'nova') + ' foi baixada. Clique para reiniciar e instalar.',
+    'not-available': 'Você já está na versão mais recente (' + (state.currentVersion || 'instalada') + ').',
+    dev: 'O atualizador só funciona na versão instalada; npm start não pode instalar atualizações.',
+    unsupported: 'O atualizador automático deste aplicativo está disponível no Windows.',
+    error: 'Não foi possível atualizar: ' + (state.error || 'erro desconhecido'),
+  };
+  els.stUpdateStatus.textContent = messages[state.status] || 'Estado do atualizador desconhecido.';
+  const busy = state.status === 'checking' || state.status === 'downloading';
+  els.stUpdateCheck.disabled = busy || state.status === 'downloaded';
+  const canAct = state.status === 'available' || state.status === 'downloaded';
+  els.stUpdateAction.hidden = !canAct;
+  els.stUpdateAction.disabled = busy;
+  els.stUpdateAction.textContent = state.status === 'downloaded'
+    ? 'Reiniciar e instalar'
+    : 'Baixar atualização';
 }
 
 // ---------- Configurações ----------
@@ -663,7 +796,16 @@ function refreshModeUi() {
 
 function openSettings() {
   fillSettings();
+  setSettingsTab('general');
   els.settings.showModal();
+}
+
+function setSettingsTab(tab) {
+  const updates = tab === 'updates';
+  els.settingsTabGeneral.setAttribute('aria-selected', String(!updates));
+  els.settingsTabUpdates.setAttribute('aria-selected', String(updates));
+  els.settingsPaneGeneral.hidden = updates;
+  els.settingsPaneUpdates.hidden = !updates;
 }
 
 async function checkServer() {
@@ -680,6 +822,8 @@ async function checkServer() {
 }
 
 function bindSettings() {
+  els.settingsTabGeneral.addEventListener('click', () => setSettingsTab('general'));
+  els.settingsTabUpdates.addEventListener('click', () => setSettingsTab('updates'));
   els.stMode.addEventListener('change', () => { saveSettings({ tokenMode: els.stMode.value }); refreshModeUi(); });
   els.stServerUrl.addEventListener('input', () => saveSettings({ serverUrl: els.stServerUrl.value.trim() }));
   els.stAccessCode.addEventListener('input', () => saveSettings({ accessCode: els.stAccessCode.value }));
@@ -693,6 +837,24 @@ function bindSettings() {
   });
   els.stCheck.addEventListener('click', checkServer);
   els.stGpu.addEventListener('click', () => window.api.openGpuDiagnostics());
+
+  els.stUpdateCheck.addEventListener('click', async () => {
+    try {
+      await window.api.checkForUpdates();
+    } catch (err) {
+      renderUpdaterStatus({ status: 'error', currentVersion: updaterUiState.currentVersion, error: friendlyError(err) });
+    }
+  });
+  els.stUpdateAction.addEventListener('click', async () => {
+    try {
+      if (updaterUiState.status === 'available') await window.api.downloadUpdate();
+      else if (updaterUiState.status === 'downloaded') await window.api.installUpdate();
+    } catch (err) {
+      renderUpdaterStatus({ status: 'error', currentVersion: updaterUiState.currentVersion, error: friendlyError(err) });
+    }
+  });
+  window.api.onUpdaterStatus(renderUpdaterStatus);
+  window.api.getUpdaterStatus().then(renderUpdaterStatus).catch(() => {});
   els.settingsBtn.addEventListener('click', openSettings);
   els.settingsClose.addEventListener('click', () => els.settings.close());
   els.settingsDone.addEventListener('click', () => els.settings.close());
@@ -739,7 +901,7 @@ function init() {
   updateGrid();
 
   if (window.api && window.api.getAppInfo) {
-    window.api.getAppInfo().then((info) => { els.appVersion.textContent = `Versão ${info.version}`; }).catch(() => {});
+    window.api.getAppInfo().then((info) => { els.appVersion.textContent = `Versão ${info.version}`; if (els.stUpdateVersion) els.stUpdateVersion.textContent = `Versão instalada: ${info.version}`; }).catch(() => {});
   }
 }
 
