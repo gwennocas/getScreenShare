@@ -57,7 +57,9 @@ Em cada tela recebida, o botão de informação alterna entre resumo, detalhes c
 - Encoder: o nome da implementação em uso (por exemplo, `OpenH264` é por software).
 - Limite: o que está segurando a qualidade (processador ou internet).
 
-Se aparecer "processador", teste desligar o simulcast nas configurações e compartilhar de novo. O app habilita no Windows a opção experimental `MediaFoundationH264CbpEncoding` para permitir o encoder por hardware com H.264 Constrained Baseline. O Chromium ainda pode usar `OpenH264` se a GPU ou o driver não oferecerem um encoder compatível. Em Configurações, o estado de `Video Encode` mostra a disponibilidade geral da GPU; o painel "Seu envio" mostra o encoder realmente usado. "Abrir diagnóstico da GPU" exibe os detalhes de `chrome://gpu`.
+O app prioriza H.264 High quando o Chromium anuncia suporte a esse perfil, preservando os demais para compatibilidade com o servidor. Em um teste local com RX 6600, Baseline, Main e High usaram `MediaFoundationVideoEncodeAccelerator (AMDh264Encoder)`, enquanto Constrained Baseline usou `OpenH264`. O painel "Seu envio" mostra o perfil negociado e o encoder realmente usado. O LiveKit está fixado na versão 2.23.0 porque a configuração de preferência usa seu evento de criação do sender e o acesso ao transceiver do transporte.
+
+Se aparecer "processador", teste desligar o simulcast nas configurações e compartilhar de novo. Em Configurações, o estado de `Video Encode` mostra a disponibilidade geral da GPU; "Abrir diagnóstico da GPU" exibe os detalhes de `chrome://gpu`. A disponibilidade geral não garante que o perfil negociado ou a configuração de transmissão possam usar hardware.
 
 ## Estrutura
 

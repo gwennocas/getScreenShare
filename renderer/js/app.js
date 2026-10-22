@@ -110,6 +110,7 @@ function renderKv(dl, rows) {
     dt.textContent = k;
     const dd = document.createElement('dd');
     dd.textContent = v;
+    dd.title = v;
     if (k === 'Codificação' || k === 'Decodificador') {
       dd.dataset.tone = v === 'placa de vídeo' ? 'good' : v === 'processador' ? 'warn' : '';
     }
@@ -187,6 +188,7 @@ async function joinRoom(event) {
       adaptiveStream: true, // só baixa a resolução que o quadro realmente mostra
       dynacast: true,       // quem transmite para de enviar camadas que ninguém está vendo
     });
+    installH264ProfilePreference(r, getSettings);
     bindRoomEvents(r);
     await r.connect(url, token);
     try { await r.startAudio(); } catch (_) { /* sem problema */ }

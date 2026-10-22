@@ -7,13 +7,8 @@ const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell } = require
 const tokens = require('./token');
 const { autoUpdater } = require('electron-updater');
 
-// O WebRTC costuma negociar H.264 Constrained Baseline. No Windows, o Chromium
-// mantém a codificação dessa variante por Media Foundation desativada por padrão.
-// O driver ainda precisa oferecer um encoder compatível; o WebRTC pode recair
-// para OpenH264 caso a inicialização do encoder por hardware falhe.
-if (process.platform === 'win32') {
-  app.commandLine.appendSwitch('enable-features', 'MediaFoundationH264CbpEncoding');
-}
+// A aceleração usa os padrões do Chromium. A preferência de perfil H.264 é
+// configurada no transceiver, antes da negociação, em renderer/js/encoder.js.
 
 app.setName('getScreenShare');
 if (process.platform === 'win32') app.setAppUserModelId('com.getscreenshare.app');

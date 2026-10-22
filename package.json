@@ -1,6 +1,6 @@
 {
   "name": "getscreenshare",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Compartilhamento de tela em tempo real (Electron + LiveKit)",
   "main": "main.js",
   "author": "getScreenShare",
@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "electron-updater": "^6.8.9",
-    "livekit-client": "^2.23.0",
+    "livekit-client": "2.23.0",
     "wasapi-loopback": "github:thomas-quant/wasapi-loopback#main"
   },
   "devDependencies": {

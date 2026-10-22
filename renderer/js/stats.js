@@ -26,6 +26,18 @@ function codecLabel(report, codecId) {
   return c && c.mimeType ? c.mimeType.replace('video/', '') : '?';
 }
 
+function codecProfileLabel(report, codecId) {
+  const codec = codecId ? report.get(codecId) : null;
+  const id = codec?.sdpFmtpLine?.match(/(?:^|;)profile-level-id=([0-9a-f]{6})(?:;|$)/i)?.[1];
+  if (!id || codec.mimeType.toLowerCase() !== 'video/h264') return '-';
+  const profile = id.toLowerCase();
+  const label = profile.startsWith('64') ? 'High'
+    : profile.startsWith('4d') ? 'Main'
+      : profile.startsWith('42e') ? 'Constrained Baseline'
+        : profile.startsWith('42') ? 'Baseline' : 'H.264';
+  return `${label} (${id})`;
+}
+
 // "powerEfficient" é o sinal do navegador de que o codec roda na placa de vídeo.
 function accelLabel(powerEfficient) {
   if (powerEfficient === true) return 'placa de vídeo';
@@ -125,6 +137,7 @@ function pollSenderStats(track, onUpdate) {
         ['Resolução', `${top.frameWidth || '?'}x${top.frameHeight || '?'}`],
         ['Frames', `${Math.round(top.framesPerSecond || 0)} fps`],
         ['Codec', codecLabel(report, top.codecId)],
+        ['Perfil', codecProfileLabel(report, top.codecId)],
         ['Bitrate', fmtBitrate(totalBps)],
         ['Codificação', accelLabel(top.powerEfficientEncoder)],
         ['Encoder', top.encoderImplementation || '?'],
