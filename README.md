@@ -37,7 +37,7 @@ No Windows, rode `npm run dist`. O instalador aparece na pasta `dist/`. Depois d
 
 No app instalado, abra **Configurações → Atualizações** e toque em **Verificar atualizações**. Se houver uma versão nova, toque em **Baixar atualização**. Quando o download terminar, toque em **Reiniciar e instalar**. O app também verifica atualizações ao abrir, mas só baixa e instala depois desses cliques.
 
-Para publicar uma versão, atualize o campo `version` em `package.json`, configure `GH_TOKEN` com permissão de escrita no repositório e rode `npm run release` no Windows. O comando gera o instalador e publica os arquivos necessários em uma GitHub Release. A versão `0.2.1` deste projeto contém o atualizador; ela ainda precisa ser publicada. Quem usa uma versão anterior precisa instalar manualmente uma versão com o atualizador uma vez.
+Para publicar uma versão, atualize o campo `version` em `package.json`, configure `GH_TOKEN` com permissão de escrita no repositório e rode `npm run release` no Windows. O comando gera o instalador e publica os arquivos necessários em uma GitHub Release. A versão `0.2.2` inclui o atualizador; quem usa uma versão anterior precisa instalar manualmente uma versão com o atualizador uma vez.
 
 ### Áudio sem o Discord
 
