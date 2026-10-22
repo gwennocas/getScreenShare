@@ -260,6 +260,7 @@ input:hover, select:hover { border-color: var(--faint); }
 }
 .tile:focus-visible { outline-offset: -2px; }
 .tile video { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; }
+.tile[data-id$=":camera"] video { object-fit: cover; }
 .tile:fullscreen { border: 0; border-radius: 0; }
 
 .tile-top {
@@ -312,6 +313,7 @@ input:hover, select:hover { border-color: var(--faint); }
 .empty p { margin: 0; max-width: 46ch; color: var(--muted); }
 
 #dock { grid-column: 2; display: flex; justify-content: center; gap: 10px; padding: 14px; }
+#dock .btn { white-space: nowrap; }
 
 /* ---------- Avisos ---------- */
 
@@ -336,6 +338,8 @@ dialog {
 dialog[open] { display: flex; flex-direction: column; }
 dialog::backdrop { background: rgba(8, 10, 16, 0.72); }
 #settings { width: min(560px, 92vw); }
+#camera-picker { width: min(440px, 92vw); }
+.camera-picker-body { display: flex; flex-direction: column; gap: 12px; padding: 20px; }
 
 .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 14px 20px; border-bottom: 1px solid var(--line); }
 .modal-head h2 { font-size: 20px; }

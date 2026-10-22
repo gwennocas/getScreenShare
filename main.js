@@ -163,6 +163,18 @@ function setupDisplayMediaHandler() {
   });
 }
 
+function setupCameraPermission() {
+  session.defaultSession.setPermissionCheckHandler((webContents, permission, _origin, details) => (
+    !!win && webContents === win.webContents && permission === 'media' && details.mediaType === 'video'
+  ));
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    const cameraOnly = permission === 'media'
+      && details.mediaTypes?.includes('video')
+      && !details.mediaTypes.includes('audio');
+    callback(!!win && webContents === win.webContents && cameraOnly);
+  });
+}
+
 
 // Encontra o processo raiz do Discord (os processos filhos também serão excluídos
 // pelo WASAPI Process Loopback). Não usa shell para construir o comando.
@@ -323,6 +335,7 @@ ipcMain.handle('get-app-info', () => ({ version: app.getVersion() }));
 app.whenReady().then(() => {
   setupDisplayMediaHandler();
   createWindow();
+  setupCameraPermission();
   setupAutoUpdater();
 
   // Verifica sozinho ao abrir, mas nunca baixa/instala sem a confirmação do usuário.

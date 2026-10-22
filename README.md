@@ -3,6 +3,8 @@
 App de desktop para compartilhar a tela em tempo real, feito com Electron e WebRTC (LiveKit).
 Cada pessoa entra numa sala pelo nome, escolhe uma tela ou janela e todos na sala assistem com poucos milissegundos de atraso.
 
+Na sala, **Ligar câmera** permite escolher uma câmera disponível e publicá-la ao lado das telas. Se uma câmera não aparecer na lista, use **Detectar outras câmeras** para autorizar o acesso e atualizar os dispositivos. A câmera pode continuar ligada enquanto você compartilha a tela. **Desligar câmera** interrompe a captura; o microfone não é ativado.
+
 ## Rodar durante o desenvolvimento (Windows)
 
 1. Instale o Node.js (versão LTS) em https://nodejs.org

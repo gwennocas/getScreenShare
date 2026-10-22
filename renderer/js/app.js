@@ -16,6 +16,11 @@ const els = {
   own: $('own'), ownStats:$('own-stats'),
   grid: $('grid'), empty:$('empty'), emptyTitle: $('empty-title'), emptyText:$('empty-text'),
   share: $('btn-share'), stop: $('btn-stop'), leave:$('btn-leave'),
+  camera: $('btn-camera'), cameraStop: $('btn-camera-stop'),
+  cameraPicker: $('camera-picker'), cameraDevice: $('camera-device'), cameraHint: $('camera-hint'),
+  cameraDetect: $('camera-detect'),
+  cameraPickerStart: $('camera-picker-start'), cameraPickerCancel: $('camera-picker-cancel'),
+  cameraPickerClose: $('camera-picker-close'),
   audioSink: $('audio-sink'), toasts: $('toasts'), settingsBtn:$('btn-settings'),
   picker: $('picker'), pickerGrid: $('picker-grid'), pickerHint:$('picker-hint'),
   pickerStart: $('picker-start'), pickerCancel: $('picker-cancel'), pickerClose:$('picker-close'),
@@ -38,6 +43,8 @@ let leaving = false;
 let focusedId = null;
 let stopOwnStats = null;
 let localShareTrack = null;
+let localCameraTrack = null;
+let cameraBusy = false;
 let pickedSourceId = null;
 let pickerKind = 'screen';
 let pickerSources = [];
@@ -45,7 +52,7 @@ let excludedAudioContext = null;
 let excludedAudioNode = null;
 let excludedAudioTrack = null;
 
-const tiles = new Map();       // identity -> { el, video, track, stop, statsEl }
+const tiles = new Map();       // identity:source -> { el, video, track, stop }
 const audioByPeer = new Map(); // identity -> { els: [], volume, muted }
 
 // ---------- Utilidades ----------
@@ -95,6 +102,10 @@ function cleanRoom(v) {
 
 function displayName(p) {
   return p.name || p.identity;
+}
+
+function tileId(participant, source) {
+  return `${participant.identity}:${source}`;
 }
 
 function hashIndex(str, mod) {
@@ -212,6 +223,7 @@ async function joinRoom(event) {
 async function leaveRoom() {
   if (!room) return;
   leaving = true;
+  await stopCamera();
   await stopExcludedAudioTrack();
   try { await room.disconnect(); } catch (_) { /* ignora */ }
   // o evento Disconnected faz a limpeza
@@ -221,6 +233,13 @@ function cleanupRoom() {
   void stopExcludedAudioTrack();
   if (stopOwnStats) { stopOwnStats(); stopOwnStats = null; }
   localShareTrack = null;
+  if (localCameraTrack) localCameraTrack.stop();
+  localCameraTrack = null;
+  cameraBusy = false;
+  els.camera.disabled = false;
+  els.camera.hidden = false;
+  els.cameraStop.hidden = true;
+  if (els.cameraPicker.open) els.cameraPicker.close();
   [...tiles.keys()].forEach(removeTile);
   audioByPeer.forEach((a) => a.els.forEach((e) => e.remove()));
   audioByPeer.clear();
@@ -240,7 +259,8 @@ function bindRoomEvents(r) {
     .on(RoomEvent.ParticipantConnected, (p) => { toast(`${displayName(p)} entrou`); renderPeople(); })
     .on(RoomEvent.ParticipantDisconnected, (p) => {
       toast(`${displayName(p)} saiu`);
-      removeTile(p.identity);
+      removeTile(tileId(p, Track.Source.ScreenShare));
+      removeTile(tileId(p, Track.Source.Camera));
       renderPeople();
     })
     .on(RoomEvent.TrackPublished, renderPeople)
@@ -248,6 +268,7 @@ function bindRoomEvents(r) {
     .on(RoomEvent.LocalTrackPublished, renderPeople)
     .on(RoomEvent.LocalTrackUnpublished, (pub) => {
       if (pub.source === Track.Source.ScreenShare) onShareEnded();
+      if (pub.source === Track.Source.Camera) onCameraEnded();
       renderPeople();
     })
     .on(RoomEvent.ConnectionQualityChanged, (q, p) => { if (p && p.isLocal) setConnQuality(q); })
@@ -274,6 +295,11 @@ function bindRoomEvents(r) {
 
 function isSharing(p) {
   return !!p.getTrackPublication(Track.Source.ScreenShare);
+}
+
+function hasCamera(p) {
+  const pub = p.getTrackPublication(Track.Source.Camera);
+  return !!pub && !pub.isMuted;
 }
 
 function renderPeople() {
@@ -313,11 +339,21 @@ function renderPeople() {
       btn.append(live);
     }
 
-    const canWatch = !p.isLocal && tiles.has(p.identity);
+    if (hasCamera(p)) {
+      const camera = document.createElement('span');
+      camera.className = 'person-tag';
+      camera.textContent = 'câmera';
+      btn.append(camera);
+    }
+
+    const screenId = tileId(p, Track.Source.ScreenShare);
+    const cameraId = tileId(p, Track.Source.Camera);
+    const watchId = tiles.has(screenId) ? screenId : cameraId;
+    const canWatch = tiles.has(watchId);
     btn.disabled = !canWatch;
     if (canWatch) {
-      btn.title = 'Dar foco nesta tela';
-      btn.addEventListener('click', () => toggleFocus(p.identity));
+      btn.title = 'Dar foco neste vídeo';
+      btn.addEventListener('click', () => toggleFocus(watchId));
     }
     li.appendChild(btn);
     frag.appendChild(li);
@@ -328,20 +364,22 @@ function renderPeople() {
 // ---------- Telas recebidas ----------
 
 function onTrackSubscribed(track, publication, participant) {
-  if (publication.source === Track.Source.ScreenShare && track.kind === Track.Kind.Video) {
-    addTile(participant, track);
+  if ((publication.source === Track.Source.ScreenShare || publication.source === Track.Source.Camera)
+      && track.kind === Track.Kind.Video) {
+    addTile(participant, track, publication.source);
   } else if (publication.source === Track.Source.ScreenShareAudio && track.kind === Track.Kind.Audio) {
     addAudio(participant, track);
   }
 }
 
 function onTrackUnsubscribed(track, publication, participant) {
-  if (publication.source === Track.Source.ScreenShare && track.kind === Track.Kind.Video) {
-    removeTile(participant.identity);
+  if ((publication.source === Track.Source.ScreenShare || publication.source === Track.Source.Camera)
+      && track.kind === Track.Kind.Video) {
+    removeTile(tileId(participant, publication.source));
   } else if (publication.source === Track.Source.ScreenShareAudio) {
     track.detach().forEach((e) => e.remove());
     audioByPeer.delete(participant.identity);
-    const t = tiles.get(participant.identity);
+    const t = tiles.get(tileId(participant, Track.Source.ScreenShare));
     if (t) t.el.classList.remove('has-audio');
   }
 }
@@ -355,12 +393,13 @@ function addAudio(participant, track) {
   els.audioSink.appendChild(el);
   state.els.push(el);
   audioByPeer.set(id, state);
-  const t = tiles.get(id);
+  const t = tiles.get(tileId(participant, Track.Source.ScreenShare));
   if (t) t.el.classList.add('has-audio');
 }
 
-function addTile(participant, track) {
-  const id = participant.identity;
+function addTile(participant, track, source) {
+  const id = tileId(participant, source);
+  const isCamera = source === Track.Source.Camera;
   removeTile(id);
   const s = getSettings();
 
@@ -370,7 +409,7 @@ function addTile(participant, track) {
   el.dataset.stats = s.showStats ? 'on' : 'off';
   el.tabIndex = 0;
   el.setAttribute('role', 'group');
-  el.setAttribute('aria-label', `Tela de ${displayName(participant)}`);
+  el.setAttribute('aria-label', `${isCamera ? 'Câmera' : 'Tela'} de ${displayName(participant)}`);
 
   const video = track.attach();
   video.autoplay = true;
@@ -381,7 +420,7 @@ function addTile(participant, track) {
   top.className = 'tile-top';
   const nm = document.createElement('span');
   nm.className = 'tile-name';
-  nm.textContent = displayName(participant);
+  nm.textContent = `${displayName(participant)} · ${isCamera ? 'câmera' : 'tela'}`;
 
   const ctl = document.createElement('div');
   ctl.className = 'tile-ctl';
@@ -404,7 +443,7 @@ function addTile(participant, track) {
   range.value = '100';
   range.setAttribute('aria-label', 'Volume');
   const applyVolume = () => {
-    const a = audioByPeer.get(id);
+    const a = audioByPeer.get(participant.identity);
     if (!a) return;
     a.volume = range.value / 100;
     a.els.forEach((e) => { e.volume = a.volume; e.muted = a.muted; });
@@ -412,13 +451,13 @@ function addTile(participant, track) {
   };
   bMute.addEventListener('click', (e) => {
     e.stopPropagation();
-    const a = audioByPeer.get(id);
+    const a = audioByPeer.get(participant.identity);
     if (!a) return;
     a.muted = !a.muted;
     applyVolume();
   });
   range.addEventListener('input', () => {
-    const a = audioByPeer.get(id);
+    const a = audioByPeer.get(participant.identity);
     if (a && a.muted && range.value > 0) a.muted = false;
     applyVolume();
   });
@@ -460,12 +499,13 @@ function addTile(participant, track) {
     try { track.receiver.playoutDelayHint = 0; } catch (_) { /* navegador sem suporte */ }
   }
 
-  const stop = pollReceiverStats(track, (rows, brief) => {
+  const stop = participant.isLocal ? () => {} : pollReceiverStats(track, (rows, brief) => {
     renderKv(statsList, rows);
     renderBrief(statsLine, brief);
   });
   tiles.set(id, { el, video, track, stop });
-  if (audioByPeer.has(id)) el.classList.add('has-audio');
+  if (!isCamera && audioByPeer.has(participant.identity)) el.classList.add('has-audio');
+  if (participant.isLocal) { stats.remove(); bStats.remove(); }
 
   updateGrid();
   renderPeople();
@@ -507,7 +547,120 @@ function updateGrid() {
   els.emptyTitle.textContent = sharing ? 'Você está compartilhando' : 'Ninguém está compartilhando';
   els.emptyText.textContent = sharing
     ? 'Sua própria tela não aparece aqui, para não virar um espelho infinito. Quem está na sala já consegue ver.'
-    : 'Compartilhe sua tela ou espere alguém começar. As telas aparecem aqui.';
+    : 'Compartilhe sua tela ou ligue a câmera. Os vídeos da sala aparecem aqui.';
+}
+
+// ---------- Câmera ----------
+
+async function listCameras() {
+  const selected = els.cameraDevice.value || getSettings().cameraDeviceId || '';
+  els.cameraDevice.replaceChildren(new Option('Câmera padrão', ''));
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    devices.filter((device) => device.kind === 'videoinput').forEach((device, index) => {
+      if (device.deviceId) {
+        els.cameraDevice.add(new Option(device.label || `Câmera ${index + 1}`, device.deviceId));
+      }
+    });
+    if ([...els.cameraDevice.options].some((option) => option.value === selected)) {
+      els.cameraDevice.value = selected;
+    }
+  } catch (err) {
+    els.cameraHint.textContent = `Não foi possível listar as câmeras. A câmera padrão ainda pode funcionar. ${friendlyError(err)}`;
+  }
+}
+
+async function openCameraPicker() {
+  if (!room || cameraBusy || els.cameraPicker.open) return;
+  const activeRoom = room;
+  els.camera.disabled = true;
+  els.cameraHint.textContent = 'A câmera será mostrada na sala sem usar o microfone.';
+  els.cameraPickerStart.disabled = false;
+  try {
+    await listCameras();
+    if (room === activeRoom && !els.cameraPicker.open) els.cameraPicker.showModal();
+  } finally {
+    els.camera.disabled = false;
+  }
+}
+
+async function detectCameras() {
+  els.cameraDetect.disabled = true;
+  els.cameraPickerStart.disabled = true;
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    await listCameras();
+    els.cameraHint.textContent = 'Escolha o dispositivo. A câmera será mostrada sem o microfone.';
+  } catch (err) {
+    els.cameraHint.textContent = `Não foi possível acessar as câmeras. ${friendlyError(err)}`;
+  } finally {
+    stream?.getTracks().forEach((track) => track.stop());
+    els.cameraDetect.disabled = false;
+    els.cameraPickerStart.disabled = false;
+  }
+}
+
+async function startCamera() {
+  if (!room || cameraBusy) return;
+  const activeRoom = room;
+  const deviceId = els.cameraDevice.value;
+  cameraBusy = true;
+  els.cameraPickerStart.disabled = true;
+  els.camera.disabled = true;
+  try {
+    const pub = await activeRoom.localParticipant.setCameraEnabled(
+      true,
+      deviceId ? { deviceId: { exact: deviceId } } : undefined,
+      { videoCodec: getSettings().codec, simulcast: getSettings().simulcast }
+    );
+    if (!pub || !pub.track) throw new Error('Não foi possível publicar a câmera.');
+    if (room !== activeRoom || !els.cameraPicker.open) {
+      try { await activeRoom.localParticipant.unpublishTrack(pub.track); } catch (_) { /* sala encerrada */ }
+      pub.track.stop();
+      return;
+    }
+    localCameraTrack = pub.track;
+    pub.track.mediaStreamTrack.addEventListener('ended', () => {
+      if (localCameraTrack === pub.track) void stopCamera();
+    }, { once: true });
+    saveSettings({ cameraDeviceId: deviceId });
+    addTile(activeRoom.localParticipant, pub.track, Track.Source.Camera);
+    els.cameraPicker.close();
+    els.camera.hidden = true;
+    els.cameraStop.hidden = false;
+    renderPeople();
+    toast('Câmera ligada', { kind: 'ok' });
+  } catch (err) {
+    console.error(err);
+    els.cameraHint.textContent = `Não foi possível ligar a câmera. ${friendlyError(err)}`;
+    els.cameraPickerStart.disabled = false;
+  } finally {
+    cameraBusy = false;
+    els.camera.disabled = false;
+  }
+}
+
+async function stopCamera() {
+  const track = localCameraTrack;
+  if (!track) return;
+  localCameraTrack = null;
+  if (room) {
+    try { await room.localParticipant.unpublishTrack(track); } catch (_) { /* sala pode ter fechado */ }
+  }
+  track.stop();
+  onCameraEnded();
+}
+
+function onCameraEnded() {
+  if (localCameraTrack) {
+    localCameraTrack.stop();
+    localCameraTrack = null;
+  }
+  if (room) removeTile(tileId(room.localParticipant, Track.Source.Camera));
+  els.camera.hidden = false;
+  els.cameraStop.hidden = true;
+  renderPeople();
 }
 
 // ---------- Escolher e compartilhar a própria tela ----------
@@ -885,6 +1038,12 @@ function init() {
   els.leave.addEventListener('click', leaveRoom);
   els.share.addEventListener('click', openPicker);
   els.stop.addEventListener('click', stopShare);
+  els.camera.addEventListener('click', openCameraPicker);
+  els.cameraStop.addEventListener('click', stopCamera);
+  els.cameraPickerStart.addEventListener('click', startCamera);
+  els.cameraDetect.addEventListener('click', detectCameras);
+  els.cameraPickerCancel.addEventListener('click', () => els.cameraPicker.close());
+  els.cameraPickerClose.addEventListener('click', () => els.cameraPicker.close());
 
   els.copyRoom.addEventListener('click', async () => {
     try {
@@ -904,6 +1063,7 @@ function init() {
     renderSources();
   }));
   closeOnBackdrop(els.picker);
+  closeOnBackdrop(els.cameraPicker);
   closeOnBackdrop(els.settings);
 
   bindSettings();

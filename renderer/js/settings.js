@@ -18,6 +18,7 @@ const DEFAULT_SETTINGS = {
   quality: '1080p60',
   hint: 'motion',       // 'motion' = fluidez, 'detail' = nitidez
   shareAudio: false,
+  cameraDeviceId: '',
   showStats: true,
   lowLatency: true,
 };
