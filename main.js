@@ -166,15 +166,20 @@ function setupDisplayMediaHandler() {
 function setupCapturePermissions() {
   session.defaultSession.setPermissionCheckHandler((webContents, permission, _origin, details) => {
     if (!win || webContents !== win.webContents) return false;
-    if (permission === 'display-capture') return true;
+    if (selectedSourceId && permission === 'display-capture') return true;
     return permission === 'media' && details.mediaType === 'video';
   });
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
     const cameraOnly = permission === 'media'
       && details.mediaTypes?.includes('video')
       && !details.mediaTypes.includes('audio');
+    // Electron 44.8 entrega getDisplayMedia como media com mediaTypes vazio.
+    const screenCapture = !!selectedSourceId && (
+      permission === 'display-capture'
+      || (permission === 'media' && details.mediaTypes?.length === 0)
+    );
     callback(!!win && webContents === win.webContents
-      && (permission === 'display-capture' || cameraOnly));
+      && (screenCapture || cameraOnly));
   });
 }
 
