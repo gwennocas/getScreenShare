@@ -163,15 +163,18 @@ function setupDisplayMediaHandler() {
   });
 }
 
-function setupCameraPermission() {
-  session.defaultSession.setPermissionCheckHandler((webContents, permission, _origin, details) => (
-    !!win && webContents === win.webContents && permission === 'media' && details.mediaType === 'video'
-  ));
+function setupCapturePermissions() {
+  session.defaultSession.setPermissionCheckHandler((webContents, permission, _origin, details) => {
+    if (!win || webContents !== win.webContents) return false;
+    if (permission === 'display-capture') return true;
+    return permission === 'media' && details.mediaType === 'video';
+  });
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
     const cameraOnly = permission === 'media'
       && details.mediaTypes?.includes('video')
       && !details.mediaTypes.includes('audio');
-    callback(!!win && webContents === win.webContents && cameraOnly);
+    callback(!!win && webContents === win.webContents
+      && (permission === 'display-capture' || cameraOnly));
   });
 }
 
@@ -335,7 +338,7 @@ ipcMain.handle('get-app-info', () => ({ version: app.getVersion() }));
 app.whenReady().then(() => {
   setupDisplayMediaHandler();
   createWindow();
-  setupCameraPermission();
+  setupCapturePermissions();
   setupAutoUpdater();
 
   // Verifica sozinho ao abrir, mas nunca baixa/instala sem a confirmação do usuário.
