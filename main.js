@@ -7,13 +7,16 @@ const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell } = require
 const tokens = require('./token');
 const { autoUpdater } = require('electron-updater');
 
-// A aceleração usa os padrões do Chromium. A preferência de perfil H.264 é
-// configurada no transceiver, antes da negociação, em renderer/js/encoder.js.
+// Configura VA-API antes de ready. A preferência de perfil H.264 é aplicada
+// no transceiver, antes da negociação, em renderer/js/encoder.js.
+require('./video-runtime').configureVideoRuntime(app);
 
 app.setName('getScreenShare');
 if (process.platform === 'win32') app.setAppUserModelId('com.getscreenshare.app');
 
 const BG = '#151a24';
+const isWayland = process.platform === 'linux'
+  && (process.env.XDG_SESSION_TYPE === 'wayland' || !!process.env.WAYLAND_DISPLAY);
 let win;
 
 // GETSCREENSHARE_AUTO_UPDATER: atualizações explícitas via GitHub Releases.
@@ -128,8 +131,10 @@ function createWindow() {
     backgroundColor: BG,
     icon: path.join(__dirname, 'build', 'icon.png'),
     // Barra de título própria; os botões de minimizar/fechar do Windows ficam por cima.
-    titleBarStyle: 'hidden',
-    titleBarOverlay: { color: BG, symbolColor: '#e9ecf4', height: 40 },
+    ...(process.platform === 'win32' ? {
+      titleBarStyle: 'hidden',
+      titleBarOverlay: { color: BG, symbolColor: '#e9ecf4', height: 40 },
+    } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -151,14 +156,17 @@ function createWindow() {
 function setupDisplayMediaHandler() {
   session.defaultSession.setDisplayMediaRequestHandler(async (_request, callback) => {
     try {
+      // No Wayland, getSources abre o portal PipeWire. A fonte devolvida já foi
+      // autorizada pelo usuário; não há lista de janelas para mostrar antes.
       const sources = await desktopCapturer.getSources({ types: ['screen', 'window'] });
-      const source = sources.find((s) => s.id === selectedSourceId) || sources[0];
+      const source = isWayland ? sources[0] : sources.find((s) => s.id === selectedSourceId);
+      if (!source) return callback(null);
       // Nunca pedir o loopback do Electron: o áudio é capturado separadamente
       // pelo WASAPI com exclusão explícita do processo do Discord.
       callback({ video: source });
     } catch (err) {
       console.error('Erro ao capturar tela:', err);
-      callback({});
+      callback(null);
     }
   });
 }
@@ -166,7 +174,7 @@ function setupDisplayMediaHandler() {
 function setupCapturePermissions() {
   session.defaultSession.setPermissionCheckHandler((webContents, permission, _origin, details) => {
     if (!win || webContents !== win.webContents) return false;
-    if (selectedSourceId && permission === 'display-capture') return true;
+    if ((isWayland || selectedSourceId) && permission === 'display-capture') return true;
     return permission === 'media' && details.mediaType === 'video';
   });
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
@@ -174,7 +182,7 @@ function setupCapturePermissions() {
       && details.mediaTypes?.includes('video')
       && !details.mediaTypes.includes('audio');
     // Electron 44.8 entrega getDisplayMedia como media com mediaTypes vazio.
-    const screenCapture = !!selectedSourceId && (
+    const screenCapture = (isWayland || !!selectedSourceId) && (
       permission === 'display-capture'
       || (permission === 'media' && details.mediaTypes?.length === 0)
     );
@@ -256,6 +264,7 @@ function stopNativeExcludedAudio() {
 }
 
 ipcMain.handle('list-sources', async () => {
+  if (isWayland) return [];
   const sources = await desktopCapturer.getSources({
     types: ['screen', 'window'],
     thumbnailSize: { width: 320, height: 180 },
@@ -270,6 +279,8 @@ ipcMain.handle('list-sources', async () => {
 });
 
 ipcMain.handle('select-source', (_event, { sourceId }) => {
+  if (isWayland) return true;
+  if (typeof sourceId !== 'string' || !sourceId) return false;
   selectedSourceId = sourceId;
   return true;
 });
@@ -338,7 +349,9 @@ ipcMain.handle('get-gpu-status', async () => {
   };
 });
 
-ipcMain.handle('get-app-info', () => ({ version: app.getVersion() }));
+ipcMain.handle('get-app-info', () => ({
+  version: app.getVersion(), platform: process.platform, isWayland,
+}));
 
 app.whenReady().then(() => {
   setupDisplayMediaHandler();
