@@ -3,7 +3,7 @@ const path = require('path');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const execFileAsync = promisify(execFile);
-const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, clipboard } = require('electron');
 const tokens = require('./token');
 const { autoUpdater } = require('electron-updater');
 
@@ -18,6 +18,8 @@ const BG = '#151a24';
 const isWayland = process.platform === 'linux'
   && (process.env.XDG_SESSION_TYPE === 'wayland' || !!process.env.WAYLAND_DISPLAY);
 let win;
+
+require('./room-clipboard').registerRoomClipboard({ ipcMain, clipboard, getWindow: () => win });
 
 // GETSCREENSHARE_AUTO_UPDATER: atualizações explícitas via GitHub Releases.
 let updaterState = {
