@@ -1,128 +1,232 @@
 # getScreenShare
 
-App de desktop para compartilhar a tela em tempo real, feito com Electron e WebRTC (LiveKit).
-Cada pessoa entra numa sala pelo nome, escolhe uma tela ou janela e os participantes assistem em tempo real. A latência depende da rede, do codec e do dispositivo.
+Aplicativo de desktop para compartilhar telas, janelas e câmera em salas, feito com Electron e WebRTC/LiveKit. A latência e a qualidade dependem da rede, do dispositivo e do codec.
 
-Na sala, **Ligar câmera** permite escolher uma câmera disponível e publicá-la ao lado das telas. Se uma câmera não aparecer na lista, use **Detectar outras câmeras** para autorizar o acesso e atualizar os dispositivos. A câmera pode continuar ligada enquanto você compartilha a tela. **Desligar câmera** interrompe a captura; o microfone não é ativado.
+## O que preciso instalar?
 
-## Instalar
+| Objetivo | Requisitos |
+| --- | --- |
+| Usar o instalador ou AppImage | Pacote da [release](https://github.com/gwennocas/getScreenShare/releases), dependências do sistema descritas abaixo e URL/código de um servidor de tokens existente. O runtime Node.js vem dentro do Electron. |
+| Rodar ou empacotar o código do app | Git, Node.js e npm, `npm ci` na raiz e as mesmas dependências do sistema usadas pelo aplicativo. |
+| Hospedar o servidor de tokens | Node.js/npm, instalação separada em `server/`, configuração de `server/.env` e acesso a um servidor LiveKit. |
 
-Baixe a versão desejada em [Releases](https://github.com/gwennocas/getScreenShare/releases).
+Para desenvolvimento e hospedagem, use **Node.js 24 LTS**, a versão usada no workflow de release. O mínimo declarado pelo projeto é **Node.js 22.12.0**, exigido pelo Electron fixado no lockfile. O npm vem com a distribuição oficial do Node. O arquivo `.nvmrc` seleciona a versão 24 para quem usa nvm.
 
-- **Windows x64:** execute `getScreenShare-Setup-VERSÃO.exe`.
-- **Linux x64:** baixe `getScreenShare-VERSÃO-linux-x86_64.AppImage`, permita a execução nas propriedades do arquivo e abra-o. Pelo terminal, use `chmod +x getScreenShare-*.AppImage` e execute o arquivo baixado. Algumas distribuições precisam do pacote de compatibilidade do FUSE 2 para abrir AppImages.
+O aplicativo instalado se conecta a um **servidor de tokens**, que autoriza a entrada na sala; o áudio/vídeo é transportado pelo **servidor LiveKit**. Quem já recebeu uma URL e um código de acesso pode usar essa infraestrutura existente. Para hospedar a própria, veja [Servidor de tokens e LiveKit](#servidor-de-tokens-e-livekit).
 
-Na primeira execução, configure a URL do servidor de tokens e o código de acesso em **Configurações → Geral → Conexão**.
+## Plataformas e recursos
 
 | Recurso | Windows x64 | Linux x64 |
 | --- | --- | --- |
-| Tela e janela | Seletor do aplicativo | Portal do sistema no Wayland; seletor do aplicativo no X11 |
+| Tela/janela | Seletor do aplicativo | Portal do sistema no Wayland; seletor interno no X11 |
 | Câmera | Disponível | Disponível |
-| Codificação por GPU | Conforme driver e codec | VA-API, conforme driver e codec |
-| Áudio do computador com exclusão do Discord | WASAPI, Windows compatível | Indisponível |
-| Atualização pelo aplicativo | Disponível | Instalação manual da nova versão |
+| GPU para codificação | Conforme codec e driver | VA-API, conforme codec e driver |
+| Áudio do computador excluindo Discord | WASAPI, com os requisitos abaixo | Indisponível nesta versão |
+| Atualização pelo app | Disponível no instalador NSIS | Instalação manual do novo AppImage |
 
-A captura Wayland e a codificação por GPU foram confirmadas em Arch Linux com Hyprland e Radeon RX 6600. Outros desktops precisam do backend de portal correspondente.
+A captura Wayland e a codificação por GPU foram confirmadas em **Arch Linux, Hyprland e Radeon RX 6600**. As releases publicam pacotes x64 para Linux e Windows. GNOME, KDE e X11 precisam de validação nos respectivos ambientes; a compilação por CI não substitui esse teste de desktop.
 
-## Rodar durante o desenvolvimento (Windows e Linux)
+## Usar uma versão pronta
 
-1. Instale o Node.js (versão LTS) em https://nodejs.org
-2. Para hospedar seu próprio servidor, crie um projeto no LiveKit Cloud (https://cloud.livekit.io) e obtenha a URL (`wss://...`), a API Key e o API Secret. Quem usa um servidor existente não precisa dessas credenciais.
-3. Abra um terminal nesta pasta e rode `npm install`.
-4. Configure um servidor de tokens conforme as instruções abaixo, ou obtenha a URL e o código de acesso de quem já hospeda um.
-5. Rode `npm start` e informe a URL e o código em **Configurações → Geral → Conexão**.
+Baixe o pacote na página de [Releases](https://github.com/gwennocas/getScreenShare/releases):
 
-Para testar sozinha, abra duas janelas do app (dois terminais com `npm start`), entre na mesma sala nas duas e compartilhe numa delas. Deixe "Compartilhar o áudio do computador" desmarcado nesse teste, senão o som volta em loop.
+- **Windows:** execute `getScreenShare-Setup-VERSÃO.exe` em um Windows 10/11 x64 compatível com Electron 44. Para o áudio filtrado, use Windows 10 versão 2004 ou mais recente, com Discord aberto.
+- **Linux:** baixe `getScreenShare-VERSÃO-linux-x86_64.AppImage`, permita sua execução e abra o arquivo. Exemplo para a versão 0.2.7:
 
-## Usar com amigos: servidor de tokens
+  ```sh
+  chmod +x getScreenShare-0.2.7-linux-x86_64.AppImage
+  ./getScreenShare-0.2.7-linux-x86_64.AppImage
+  ```
 
-O aplicativo usa exclusivamente um servidor de tokens. As credenciais do LiveKit ficam no servidor; o app não lê arquivos `.env` nem gera tokens localmente.
+Configure a URL base do servidor de tokens e o código em **Configurações → Geral → Conexão**. Entre em uma sala pelo nome e compartilhe esse mesmo nome com os outros participantes.
 
-A pasta `server/` tem um servidor pequeno que guarda a chave e entrega os tokens. Quem usa o app só precisa do endereço do servidor e de um código de acesso. Para hospedar outra instância no Render, clone ou faça um fork deste repositório, publique com suas próprias credenciais e configure a nova URL no app. Todos que usam essa instância compartilham o mesmo endereço de servidor.
+**Ligar câmera** permite escolher e publicar uma câmera junto com a tela. Use **Detectar outras câmeras** para autorizar o acesso e atualizar a lista de dispositivos. O microfone não é ativado pelo aplicativo.
 
-1. Entre em `server/`, copie `.env.example` para `.env` e preencha os dados do LiveKit e o `ACCESS_CODE`.
-2. Rode `npm install` e `npm start` (porta 8787 por padrão). Teste abrindo `http://localhost:8787/health`.
-3. Para publicar no Render, este projeto inclui `render.yaml`. Envie o conteúdo desta pasta para um repositório GitHub; no Render, escolha **New + → Blueprint**, conecte o repositório e informe as variáveis secretas solicitadas. A configuração aponta para `server/`, usa `npm ci` e `npm start`, configura `/health` como health check e ativa `TRUST_PROXY=1`. Alternativamente, crie um Web Service manualmente com Root Directory `server`, Build Command `npm ci`, Start Command `npm start` e Health Check Path `/health`.
-4. Depois do deploy, teste `https://SEU-SERVICO.onrender.com/health`. A resposta deve ser `{"ok":true}`.
-5. No app, abra **Configurações → Geral → Conexão**, cole somente a URL base do serviço (por exemplo, `https://SEU-SERVICO.onrender.com`, sem `/token`) e o mesmo código definido em `ACCESS_CODE`, e clique em "Testar servidor".
+### Dependências do sistema no Linux
 
-Defina `LIVEKIT_URL`, `LIVEKIT_API_KEY` e `LIVEKIT_API_SECRET` com as credenciais do seu projeto no LiveKit Cloud, além de um `ACCESS_CODE` longo e difícil de adivinhar. O servidor se recusa a iniciar se `ACCESS_CODE` estiver ausente. Nunca coloque o API Secret no repositório GitHub nem no app dos seus amigos. O servidor limita 30 pedidos por minuto por endereço e só aceita nomes de sala simples.
+O AppImage inclui o aplicativo e o Electron. A sessão gráfica, os serviços de captura e os drivers são fornecidos pela distribuição.
 
-**Nota do plano gratuito:** o Render suspende serviços web gratuitos após 15 minutos sem tráfego e pode levar cerca de um minuto para acordar no próximo pedido. A primeira tentativa de conectar ao app depois desse período pode demorar.
+| Componente | Quando é necessário |
+| --- | --- |
+| Bibliotecas de desktop do Electron, como GTK 3, NSS, ALSA, AT-SPI e GBM | Para abrir o aplicativo. Normalmente já estão presentes em uma instalação de desktop; sistemas mínimos podem precisar dos pacotes correspondentes da distribuição. |
+| PipeWire e um gerenciador de sessão, como WirePlumber | Para compartilhar a tela no Wayland. |
+| `xdg-desktop-portal` e backend do desktop | Para abrir o seletor e autorizar a captura Wayland. |
+| FUSE 2, inclusive `libfuse.so.2` | Para montar o AppImage quando a distribuição não oferece essa compatibilidade por padrão. |
+| Driver VA-API da GPU | Para tentar codificação por hardware. O app pode usar software quando o codec/driver não permite aceleração. |
 
-## Gerar o instalador
+Instale o backend adequado ao seu desktop:
 
-No Linux, rode `npm run dist` para gerar o AppImage ou `npm run dist:deb` para gerar um pacote `.deb` (requer `libcrypt.so.1` no sistema de compilação). No Windows, rode `npm run dist:win` para gerar o instalador NSIS. Os arquivos aparecem na pasta `dist/`. Depois de instalar, configure a URL do servidor de tokens e o código de acesso. Nenhum arquivo `.env` é necessário no computador de quem usa o app.
+| Desktop | Backend de captura |
+| --- | --- |
+| Hyprland | `xdg-desktop-portal-hyprland` |
+| GNOME | `xdg-desktop-portal-gnome` |
+| KDE Plasma | `xdg-desktop-portal-kde` |
+| Outros compositores | Consulte o backend recomendado pelo compositor. |
 
-### Atualizar o app
+Mantenha o backend de seleção de arquivos usado pelo desktop. O backend GTK complementa o Hyprland e não implementa sozinho a captura de tela.
 
-**No Windows instalado**, abra **Configurações → Atualizações** e toque em **Verificar atualizações**. Se houver uma versão nova, toque em **Baixar atualização**. Quando o download terminar, toque em **Reiniciar e instalar**. O app também verifica atualizações ao abrir, mas só baixa e instala depois desses cliques.
+**Exemplo Arch Linux + Hyprland**, para componentes que ainda não estejam instalados:
 
-**No Linux**, baixe o AppImage da nova versão em Releases e substitua o arquivo anterior. As configurações ficam no perfil do usuário.
+```sh
+sudo pacman -S --needed pipewire wireplumber xdg-desktop-portal \
+  xdg-desktop-portal-hyprland xdg-desktop-portal-gtk fuse2
+```
 
-### Publicar uma versão
+**Exemplo Ubuntu/Debian com GNOME:**
 
-1. Atualize `version` em `package.json` e `package-lock.json`, execute `npm test` e envie as alterações ao repositório.
-2. No GitHub, crie uma release com a tag `vVERSÃO`, apontando para o commit da versão.
-3. Ao publicar a release, o workflow `.github/workflows/release.yml` gera o instalador Windows e o AppImage Linux e anexa os pacotes e metadados de atualização. Acompanhe a execução na aba **Actions**; os downloads ficam prontos quando o workflow terminar.
+```sh
+sudo apt install pipewire wireplumber xdg-desktop-portal xdg-desktop-portal-gnome
+```
 
-O workflow usa o token automático do GitHub Actions. Para publicar localmente, configure `GH_TOKEN` com permissão de escrita no repositório e rode `npm run release` no sistema para o qual deseja gerar o pacote.
+Para o AppImage, Ubuntu 24.04 usa `sudo apt install libfuse2t64`; Ubuntu 22.04 e versões Debian que oferecem esse nome usam `sudo apt install libfuse2`. Confira o nome disponível na sua distribuição e mantenha o FUSE 3 do desktop. Veja a [documentação do AppImage](https://docs.appimage.org/user-guide/troubleshooting/fuse.html).
 
-### Compartilhamento no Wayland
+No Arch, o driver VA-API AMD é fornecido pelo Mesa; `libva-utils` oferece o diagnóstico `vainfo`. Para Intel ou NVIDIA, consulte o driver compatível com sua GPU: suporte a decodificação não garante suporte a codificação. Veja [aceleração de vídeo no Arch](https://wiki.archlinux.org/title/Hardware_video_acceleration).
 
-Em uma sessão Wayland, clique em **Compartilhar tela** e depois em **Começar a compartilhar**. Escolha a tela ou janela no portal do sistema (PipeWire/xdg-desktop-portal). É necessário ter um backend do portal instalado para seu ambiente de desktop. O seletor interno continua disponível no Windows e no Linux com X11. O áudio do computador é desativado no Linux; a captura WASAPI com exclusão do Discord continua disponível no Windows.
-
-#### Preparar o portal
-
-Instale PipeWire, WirePlumber, `xdg-desktop-portal` e o backend do seu desktop: `xdg-desktop-portal-hyprland` no Hyprland, `xdg-desktop-portal-gnome` no GNOME ou `xdg-desktop-portal-kde` no KDE Plasma. Mantenha também o backend de seleção de arquivos usado pelo seu desktop.
-
-Se o backend foi instalado com a sessão já aberta, reinicie a sessão ou reinicie os serviços de portal. No Hyprland:
+Depois de instalar um backend de portal com a sessão já aberta, encerre e abra a sessão ou reinicie seus serviços de portal. No Hyprland:
 
 ```sh
 systemctl --user restart xdg-desktop-portal-hyprland.service
 systemctl --user restart xdg-desktop-portal.service
 ```
 
-Se nem o navegador abrir o seletor de compartilhamento, consulte os logs:
+## Rodar a partir do código
+
+1. Instale [Node.js 24 LTS](https://nodejs.org/) com npm e [Git](https://git-scm.com/).
+2. Instale as dependências do sistema correspondentes ao seu desktop.
+3. No terminal:
+
+   ```sh
+   git clone https://github.com/gwennocas/getScreenShare.git
+   cd getScreenShare
+   npm ci
+   npm test
+   npm start
+   ```
+
+4. Configure a URL/código do servidor de tokens em **Configurações → Geral → Conexão** e clique em **Testar servidor**.
+
+`npm ci` instala as versões do `package-lock.json`. As dependências de desenvolvimento também são necessárias para iniciar o Electron e gerar os pacotes; evite `--omit=dev` nesse fluxo. O primeiro início ou empacotamento pode baixar o binário do Electron e ferramentas de build do GitHub, além dos pacotes do registro npm.
+
+Para testar duas pessoas no mesmo computador, abra dois terminais com `npm start` e entre na mesma sala. No Windows, deixe o áudio do computador desmarcado nesse teste para evitar retorno do som.
+
+### Dependências JavaScript
+
+| Pacote | Função | Instalação |
+| --- | --- | --- |
+| `electron` | Runtime de desktop, captura, permissões e APIs nativas | Raiz, dependência de desenvolvimento |
+| `electron-builder` | AppImage, NSIS e outros alvos de empacotamento | Raiz, dependência de desenvolvimento |
+| `livekit-client` | Salas, publicação/recepção de mídia e conexão WebRTC | Raiz |
+| `electron-updater` | Atualizações do aplicativo Windows | Raiz |
+| `wasapi-loopback` | Captura nativa de áudio excluindo o Discord | Opcional na raiz; somente Windows x64 |
+| `livekit-server-sdk` e `dotenv` | Emissão de tokens e leitura do `.env` | Instalação separada em `server/` |
+
+O `wasapi-loopback` vem de um commit fixado no GitHub e usa um binário `.node` pré-compilado. Os scripts atuais empacotam esse binário; recompilar o addon nativo é um processo separado. Como a dependência é opcional, confira sua presença no Windows antes de distribuir uma build com áudio:
+
+```sh
+node -e "require('node:fs').accessSync('node_modules/wasapi-loopback/prebuilds/windows-x86_64/wasapi-loopback-win32-x64.node')"
+```
+
+O workflow de release faz essa verificação. O LiveKit está fixado em 2.23.0 porque a preferência de perfil H.264 usa um evento do SDK e o acesso ao transporte interno em `renderer/js/encoder.js`; atualizações precisam ser testadas nessa integração.
+
+## Gerar os pacotes
+
+Execute os comandos a partir da raiz, depois de `npm ci` e `npm test`:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run dist` | Alvo padrão do sistema atual: AppImage no Linux ou NSIS no Windows |
+| `npm run dist:linux` | AppImage Linux |
+| `npm run dist:win` | Instalador Windows NSIS |
+| `npm run dist:deb` | Pacote `.deb`, como alvo adicional para compilação local |
+
+Os arquivos ficam em `dist/`. O caminho validado pelo CI compila **Linux no Ubuntu** e **Windows no Windows**. Para reproduzi-lo, use o sistema de destino; compilação cruzada pode exigir ferramentas adicionais, como Wine para determinados alvos Windows.
+
+Se o alvo `.deb` falhar por falta de `libcrypt.so.1`, instale a biblioteca de compatibilidade da distribuição de build. No Arch, ela é fornecida por [`libxcrypt-compat`](https://archlinux.org/packages/core/x86_64/libxcrypt-compat/). Essa exigência vem da ferramenta de empacotamento; as releases atuais distribuem AppImage e NSIS.
+
+## Servidor de tokens e LiveKit
+
+A raiz e `server/` têm lockfiles e instalações independentes. Para instalar o servidor, a partir da raiz:
+
+```sh
+npm --prefix server ci
+```
+
+Copie `server/.env.example` para `server/.env` (`cp` no Linux ou `Copy-Item` no PowerShell) e preencha:
+
+| Variável | Valor |
+| --- | --- |
+| `LIVEKIT_URL` | URL WebSocket do seu servidor LiveKit, normalmente `wss://...` |
+| `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | Credenciais do servidor LiveKit |
+| `ACCESS_CODE` | Código compartilhado, longo e difícil de adivinhar |
+| `PORT` | Porta HTTP do servidor de tokens; padrão 8787 |
+| `TRUST_PROXY` | Padrão 0; use 1 somente atrás de um proxy confiável que controle `X-Forwarded-For` |
+
+Inicie pelo diretório do servidor, para carregar `server/.env`:
+
+```sh
+npm --prefix server start
+```
+
+`npm run server`, na raiz, é um atalho para esse mesmo comando.
+
+Teste `http://localhost:8787/health`; a resposta esperada é `{"ok":true}`. Essa rota verifica o servidor de tokens, sem testar uma conexão de mídia com o LiveKit.
+
+O servidor LiveKit pode ser o [LiveKit Cloud](https://cloud.livekit.io/) ou uma [instância hospedada por você](https://docs.livekit.io/transport/self-hosting/). O servidor de tokens apenas emite a autorização; ele não substitui o servidor de mídia.
+
+As credenciais secretas ficam no servidor. O app recebe a URL base do serviço de tokens, sem adicionar `/token`, e o `ACCESS_CODE`. Para acesso pela internet, publique o serviço de tokens com HTTPS. Todas as pessoas com esse código podem solicitar acesso a salas da instância; o nome da sala não é uma senha individual. O código é salvo nas configurações locais do app (`localStorage`).
+
+### Hospedar no Render
+
+O arquivo `render.yaml` configura Root Directory `server`, Build Command `npm ci`, Start Command `npm start`, health check `/health` e `TRUST_PROXY=1`. No Render, crie um serviço por **New → Blueprint**, conecte o repositório e informe as quatro variáveis secretas solicitadas. Depois confira `/health` na URL pública e configure essa URL no aplicativo. Em planos com suspensão por inatividade, a primeira conexão pode demorar enquanto o serviço acorda.
+
+## Atualizar e publicar
+
+**Windows instalado:** use **Configurações → Atualizações**, verifique a versão, baixe e reinicie para instalar. **Linux:** baixe o novo AppImage e substitua o arquivo anterior. As configurações ficam no perfil do usuário.
+
+Para publicar:
+
+1. Atualize a versão de `package.json` e `package-lock.json`, execute `npm test` e envie as alterações ao repositório.
+2. Crie uma release no GitHub com a tag `vVERSÃO`, apontando para o commit correspondente.
+3. Ao publicar, `.github/workflows/release.yml` instala as dependências, executa os testes e gera os pacotes nos dois sistemas. O workflow usa o token automático do GitHub Actions para anexar os arquivos.
+4. Aguarde as duas execuções concluírem com sucesso e confira AppImage, instalador, blockmap e metadados `latest*.yml` na release.
+
+Para publicar localmente, configure `GH_TOKEN` no ambiente de build e use `npm run release` no sistema de destino. Credenciais de publicação pertencem ao ambiente de build.
+
+## Diagnóstico
+
+| Sintoma | O que conferir |
+| --- | --- |
+| AppImage pede FUSE | Instale a compatibilidade FUSE 2 correspondente à distribuição. |
+| Arquivo `.so` ausente | Execute o AppImage pelo terminal e instale o pacote da biblioteca apontada pelo erro. Bibliotecas do desktop continuam sendo dependências do sistema. |
+| Nenhum seletor Wayland, inclusive no navegador | Verifique PipeWire, WirePlumber, backend do portal e ambiente da sessão. |
+| `No such interface org.freedesktop.portal.ScreenCast` | O portal principal não carregou a interface de captura; confira o backend e reinicie os serviços/sessão. |
+| Tela funciona, áudio não inicia no Windows | Confira Windows x64 compatível, Discord aberto e o binário WASAPI. |
+| `Codificação: processador` / `OpenH264` | Confira driver, codec e perfis de codificação. Experimente desativar simulcast e iniciar outra transmissão. |
+| GPU disponível, mas envio sem frames/bitrate | O LiveKit pode suspender camadas sem espectadores; valide com outra pessoa na sala. |
+| Servidor de tokens não inicia | Instale `server/` separadamente e confira `server/.env`, Node e as variáveis obrigatórias. |
+
+No Hyprland, consulte:
 
 ```sh
 journalctl --user -b -u xdg-desktop-portal -u xdg-desktop-portal-hyprland
+systemctl --user show-environment
 ```
 
-A mensagem `No such interface org.freedesktop.portal.ScreenCast` indica que o portal não carregou o suporte à captura. Confira o backend instalado e se o ambiente da sessão contém `XDG_CURRENT_DESKTOP` e `WAYLAND_DISPLAY`. Veja também a [documentação de compartilhamento do Hyprland](https://wiki.hypr.land/useful-utilities/screen-sharing/).
+O ambiente dos serviços deve conter `XDG_CURRENT_DESKTOP` e `WAYLAND_DISPLAY`. Veja a [documentação de compartilhamento do Hyprland](https://wiki.hypr.land/useful-utilities/screen-sharing/).
 
-### Áudio sem o Discord
+O painel **Seu envio** mostra o encoder e o perfil negociado. No Linux, `VaapiVideoEncodeAccelerator` indica VA-API; `OpenH264` é software. **Abrir diagnóstico da GPU** mostra `chrome://gpu`; a disponibilidade geral de `Video Encode` não garante que todo perfil/configuração use hardware. O app habilita VA-API com ANGLE/OpenGL; `--disable-features=AcceleratedVideoEncoder` permite desativar essa opção para diagnóstico.
 
-Ao marcar **Compartilhar o áudio do computador**, o app captura os sons do sistema pelo WASAPI, excluindo o Discord e seus processos filhos. O recurso exige Windows x64, Discord aberto e Windows 10 versão 2004 ou mais recente. Se a captura filtrada não iniciar, a tela continua sendo compartilhada sem áudio.
+O app prioriza H.264 High quando o Chromium anuncia suporte. No teste Windows com RX 6600, Baseline, Main e High usaram `MediaFoundationVideoEncodeAccelerator (AMDh264Encoder)`; Constrained Baseline usou `OpenH264`.
 
-## Onde mexer na responsividade
+## Desenvolvimento e validação
 
-- Configurações do app: codec (H.264, VP8, VP9), simulcast, reduzir atraso de reprodução.
-- `renderer/js/settings.js`: resolução, fps e bitrate de cada qualidade.
-- `renderer/js/app.js`, em `startShare()`: `contentHint` e `degradationPreference`. Em `addTile()`: `jitterBufferTarget`.
+- `renderer/js/settings.js`: resolução, fps, bitrate, codec, simulcast e preferências locais.
+- `renderer/js/app.js`: salas, câmera, captura, reprodução e interface.
+- `renderer/js/stats.js` e `encoder.js`: estatísticas e preferência de perfil H.264.
+- `main.js` / `preload.js`: janela, permissões e ponte entre interface e APIs nativas.
+- `video-runtime.js` / `room-clipboard.js`: configuração VA-API e cópia nativa.
+- `token.js`: cliente do servidor de tokens; `server/`: emissão de tokens.
+- `test/`: testes de configuração de vídeo e clipboard.
+- `build/`: ícones; `.github/workflows/release.yml`: publicação.
 
-## Estatísticas e codificação por placa de vídeo
-
-Em cada tela recebida, o botão de informação alterna entre resumo, detalhes completos e escondido. Enquanto você compartilha, o painel "Seu envio" mostra, entre outras coisas:
-
-- Codificação: "placa de vídeo" ou "processador". Vem do sinal `powerEfficientEncoder` do navegador.
-- Encoder: o nome da implementação em uso (por exemplo, `OpenH264` é por software).
-- Limite: o que está segurando a qualidade (processador ou internet).
-
-O app prioriza H.264 High quando o Chromium anuncia suporte a esse perfil, preservando os demais para compatibilidade com o servidor. Em um teste no Windows com RX 6600, Baseline, Main e High usaram `MediaFoundationVideoEncodeAccelerator (AMDh264Encoder)`, enquanto Constrained Baseline usou `OpenH264`. O painel "Seu envio" mostra o perfil negociado e o encoder realmente usado. O LiveKit está fixado na versão 2.23.0 porque a configuração de preferência usa seu evento de criação do sender e o acesso ao transceiver do transporte.
-
-No Linux, `VaapiVideoEncodeAccelerator` identifica a codificação por VA-API; `OpenH264` identifica software. O app habilita o encoder VA-API do Chromium e usa ANGLE/OpenGL por padrão. O driver precisa oferecer codificação para o codec escolhido; confira o encoder realmente usado no painel "Seu envio". É possível passar `--disable-features=AcceleratedVideoEncoder` para desativar essa opção ao diagnosticar problemas.
-
-Se aparecer "processador", teste desligar o simulcast nas configurações e compartilhar de novo. Em Configurações, o estado de `Video Encode` mostra a disponibilidade geral da GPU; "Abrir diagnóstico da GPU" exibe os detalhes de `chrome://gpu`. A disponibilidade geral não garante que o perfil negociado ou a configuração de transmissão possam usar hardware.
-
-## Estrutura
-
-- `main.js`: janela, lista de telas, captura e tokens
-- `video-runtime.js`: inicialização da codificação VA-API no Linux
-- `test/`: testes da configuração de vídeo
-- `.github/workflows/release.yml`: pacotes Windows e Linux para Releases
-- `token.js`: gera ou busca o token da sala
-- `preload.js`: ponte segura entre a interface e o `main.js`
-- `renderer/`: interface (`index.html`, `style.css`, `js/`, `fonts/`)
-- `server/`: servidor de tokens
-- `build/`: ícone do app
+`npm test` cobre essas unidades, não o fluxo completo de mídia. Antes de distribuir mudanças de captura/SDK, teste entrada de duas pessoas, tela/janela, câmera, encerramento da captura e reconexão nos sistemas afetados. O workflow atual executa testes na publicação da release; ainda não há um workflow de testes por pull request.

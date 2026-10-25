@@ -7,7 +7,7 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "server": "node server/index.js",
+    "server": "npm --prefix server start",
     "dist": "electron-builder",
     "release": "electron-builder --publish always",
     "dist:win": "electron-builder --win",
@@ -73,6 +73,9 @@
     }
   },
   "optionalDependencies": {
-    "wasapi-loopback": "github:thomas-quant/wasapi-loopback#main"
+    "wasapi-loopback": "github:thomas-quant/wasapi-loopback#1ecb8ec403bbc010e5951cd9cf491e2e3ad1b2e0"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }
