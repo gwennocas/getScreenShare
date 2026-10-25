@@ -48,6 +48,8 @@ let cameraBusy = false;
 let pickedSourceId = null;
 let pickerKind = 'screen';
 let pickerSources = [];
+let appPlatform = 'unknown';
+let usesWaylandPortal = false;
 let excludedAudioContext = null;
 let excludedAudioNode = null;
 let excludedAudioTrack = null;
@@ -670,9 +672,18 @@ async function openPicker() {
   const s = getSettings();
   els.pkQuality.value = s.quality;
   els.pkHint.value = s.hint;
-  els.pkAudio.checked = s.shareAudio;
+  els.pkAudio.checked = appPlatform === 'win32' && s.shareAudio;
+  els.pkAudio.disabled = appPlatform !== 'win32';
+  els.pkAudio.closest('label').hidden = appPlatform !== 'win32';
   els.picker.showModal();
-  await loadSources();
+  if (usesWaylandPortal) {
+    document.querySelector('.picker-bar').hidden = true;
+    els.pickerGrid.hidden = true;
+    els.pickerHint.textContent = 'Ao começar, escolha a tela ou janela no portal do sistema.';
+    els.pickerStart.disabled = false;
+  } else {
+    await loadSources();
+  }
 }
 
 async function loadSources() {
@@ -814,22 +825,22 @@ async function stopExcludedAudioTrack() {
 }
 
 async function startShare() {
-  if (!room || !pickedSourceId) return;
+  if (!room || (!usesWaylandPortal && !pickedSourceId)) return;
   const s = getSettings();
   const qualityKey = els.pkQuality.value;
   const hint = els.pkHint.value;
-  const withAudio = els.pkAudio.checked;
+  const withAudio = appPlatform === 'win32' && els.pkAudio.checked;
   const q = QUALITY[qualityKey];
 
   els.pickerStart.disabled = true;
   try {
-    await window.api.selectSource(pickedSourceId, false);
+    if (!usesWaylandPortal) await window.api.selectSource(pickedSourceId, false);
 
     // Configuração de compartilhamento de tela com suporte otimizado para GPU/Hardware
     const pub = await room.localParticipant.setScreenShareEnabled(
       true,
       {
-        audio: false, // o áudio é publicado separadamente, após excluir o processo do Discord
+        audio: false, // áudio WASAPI é publicado separadamente no Windows
         contentHint: hint, // 'motion' = fluidez, 'detail' = nitidez
         resolution: { width: q.width, height: q.height, frameRate: q.fps },
       },
@@ -911,7 +922,7 @@ function renderUpdaterStatus(state) {
     downloaded: 'A versão ' + (state.version || 'nova') + ' foi baixada. Clique para reiniciar e instalar.',
     'not-available': 'Você já está na versão mais recente (' + (state.currentVersion || 'instalada') + ').',
     dev: 'O atualizador só funciona na versão instalada; npm start não pode instalar atualizações.',
-    unsupported: 'O atualizador automático deste aplicativo está disponível no Windows.',
+    unsupported: 'Atualização automática indisponível no Linux. Instale uma nova versão manualmente.',
     error: 'Não foi possível atualizar: ' + (state.error || 'erro desconhecido'),
   };
   els.stUpdateStatus.textContent = messages[state.status] || 'Estado do atualizador desconhecido.';
@@ -1071,7 +1082,12 @@ function init() {
   updateGrid();
 
   if (window.api && window.api.getAppInfo) {
-    window.api.getAppInfo().then((info) => { els.appVersion.textContent = `Versão ${info.version}`; if (els.stUpdateVersion) els.stUpdateVersion.textContent = `Versão instalada: ${info.version}`; }).catch(() => {});
+    window.api.getAppInfo().then((info) => {
+      appPlatform = info.platform;
+      usesWaylandPortal = !!info.isWayland;
+      els.appVersion.textContent = `Versão ${info.version}`;
+      if (els.stUpdateVersion) els.stUpdateVersion.textContent = `Versão instalada: ${info.version}`;
+    }).catch(() => {});
   }
 }
 
