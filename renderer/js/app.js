@@ -1058,7 +1058,7 @@ function init() {
 
   els.copyRoom.addEventListener('click', async () => {
     try {
-      await navigator.clipboard.writeText(els.roomName.textContent);
+      await window.api.copyRoomName(els.roomName.textContent);
       toast('Nome da sala copiado', { kind: 'ok' });
     } catch (_) {
       toast('Não foi possível copiar o nome da sala', { kind: 'error' });

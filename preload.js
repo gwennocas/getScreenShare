@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 let audioChunkListener = null;
 
 contextBridge.exposeInMainWorld('api', {
+  copyRoomName: (roomName) => ipcRenderer.invoke('copy-room-name', roomName),
   listSources: () => ipcRenderer.invoke('list-sources'),
   selectSource: (sourceId, audio) => ipcRenderer.invoke('select-source', { sourceId, audio }),
   startExcludedAudio: () => ipcRenderer.invoke('start-excluded-audio'),
