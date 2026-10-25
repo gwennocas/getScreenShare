@@ -1,6 +1,6 @@
 {
   "name": "getscreenshare",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Compartilhamento de tela em tempo real (Electron + LiveKit)",
   "main": "main.js",
   "author": "getScreenShare",
@@ -8,17 +8,20 @@
   "scripts": {
     "start": "electron .",
     "server": "node server/index.js",
-    "dist": "electron-builder --win",
-    "release": "electron-builder --win --publish always"
+    "dist": "electron-builder",
+    "release": "electron-builder --publish always",
+    "dist:win": "electron-builder --win",
+    "dist:deb": "electron-builder --linux deb",
+    "test": "node --test test/*.test.js",
+    "dist:linux": "electron-builder --linux AppImage"
   },
   "dependencies": {
-    "electron-updater": "^6.8.9",
-    "livekit-client": "2.23.0",
-    "wasapi-loopback": "github:thomas-quant/wasapi-loopback#main"
+    "electron-updater": "6.8.11",
+    "livekit-client": "2.23.0"
   },
   "devDependencies": {
-    "electron": "^44.8.0",
-    "electron-builder": "^26.15.3"
+    "electron": "44.9.3",
+    "electron-builder": "26.18.0"
   },
   "build": {
     "appId": "com.getscreenshare.app",
@@ -29,6 +32,7 @@
     },
     "files": [
       "main.js",
+      "video-runtime.js",
       "preload.js",
       "token.js",
       "renderer/**/*",
@@ -38,7 +42,8 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "artifactName": "getScreenShare-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -55,6 +60,18 @@
         "repo": "getScreenShare",
         "releaseType": "release"
       }
-    ]
+    ],
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "AudioVideo",
+      "icon": "build/icon.png",
+      "maintainer": "gwennocas <gwennocas@users.noreply.github.com>",
+      "artifactName": "getScreenShare-${version}-linux-${arch}.${ext}"
+    }
+  },
+  "optionalDependencies": {
+    "wasapi-loopback": "github:thomas-quant/wasapi-loopback#main"
   }
 }
