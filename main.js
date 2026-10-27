@@ -4,15 +4,22 @@ const { execFile } = require('child_process');
 const { promisify } = require('util');
 const execFileAsync = promisify(execFile);
 const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, clipboard, Tray, Menu, nativeImage, autoUpdater: nativeUpdater } = require('electron');
+
+app.setName('getScreenShare');
+if (process.platform === 'win32') app.setAppUserModelId('com.getscreenshare.app');
+
+// Este módulo CommonJS encerra a inicialização da cópia adicional antes de
+// carregar serviços, registrar IPC ou criar outra janela/ícone da bandeja.
+if (!require('./single-instance').acquireSingleInstance({
+  app, showWindow: () => trayLifecycle.showWindow(),
+})) return;
+
 const tokens = require('./token');
 const { autoUpdater } = require('electron-updater');
 
 // Configura VA-API antes de ready. A preferência de perfil H.264 é aplicada
 // no transceiver, antes da negociação, em renderer/js/encoder.js.
 require('./video-runtime').configureVideoRuntime(app);
-
-app.setName('getScreenShare');
-if (process.platform === 'win32') app.setAppUserModelId('com.getscreenshare.app');
 
 const BG = '#111315';
 const isWayland = process.platform === 'linux'
