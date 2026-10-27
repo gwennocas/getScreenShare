@@ -293,7 +293,11 @@ ipcMain.handle('start-excluded-audio', async () => {
   const addon = loadWasapiLoopback();
   let started = false;
   try {
-    started = addon.start(discordPid, (chunk) => {
+    started = addon.start(discordPid, (err, chunk) => {
+      if (err) {
+        console.error('Erro na captura WASAPI:', err);
+        return;
+      }
       if (!win || win.isDestroyed()) return;
       try {
         const bytes = Buffer.from(chunk);
