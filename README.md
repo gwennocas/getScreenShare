@@ -3,6 +3,10 @@
 App de desktop para compartilhar a tela em tempo real, feito com Electron e WebRTC (LiveKit).
 Cada pessoa entra numa sala pelo nome, escolhe uma tela ou janela e os participantes assistem em tempo real. A latência depende da rede, do codec e do dispositivo.
 
+Durante o compartilhamento, use **Trocar tela** para escolher outra tela ou janela sem parar a transmissão. Confirme a nova fonte no seletor; o áudio, a câmera e a qualidade atual são mantidos. No Wayland, a escolha acontece no portal do sistema. Se cancelar a escolha ou a nova captura falhar, a fonte atual continua sendo transmitida.
+
+O botão **X** esconde a janela na bandeja do sistema e mantém a sala, a tela, a câmera e o áudio funcionando. Clique no ícone da bandeja ou em **Abrir getScreenShare** no menu dele para voltar. Para encerrar o aplicativo e a transmissão, escolha **Sair** nesse menu. Se o ícone da bandeja não puder ser criado, o **X** fecha normalmente.
+
 Na sala, **Ligar câmera** permite escolher uma câmera disponível e publicá-la ao lado das telas. Se uma câmera não aparecer na lista, use **Detectar outras câmeras** para autorizar o acesso e atualizar os dispositivos. A câmera pode continuar ligada enquanto você compartilha a tela. **Desligar câmera** interrompe a captura; o microfone não é ativado.
 
 ## Instalar
@@ -118,6 +122,7 @@ Se aparecer "processador", teste desligar o simulcast nas configurações e comp
 ## Estrutura
 
 - `main.js`: janela, lista de telas, captura e tokens
+- `tray-lifecycle.js`: bandeja do sistema, reabertura e encerramento do aplicativo
 - `video-runtime.js`: inicialização da codificação VA-API no Linux
 - `test/`: testes da configuração de vídeo
 - `.github/workflows/release.yml`: pacotes Windows e Linux para Releases

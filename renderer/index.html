@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self' wss: https:; worker-src 'self' blob:;" />
   <title>getScreenShare</title>
@@ -33,18 +34,9 @@
   <!-- Barra superior (também arrasta a janela) -->
   <header id="topbar">
     <div class="brand">
-      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
-        <rect width="32" height="32" rx="8" fill="#1b2130"/>
-        <g>
-          <rect x="5" y="7" width="3" height="14" fill="#d9dce6"/>
-          <rect x="8" y="7" width="3" height="14" fill="#e6c84a"/>
-          <rect x="11" y="7" width="3" height="14" fill="#4ac2c2"/>
-          <rect x="14" y="7" width="3" height="14" fill="#5cc060"/>
-          <rect x="17" y="7" width="3" height="14" fill="#b85ad6"/>
-          <rect x="20" y="7" width="3" height="14" fill="#e2483c"/>
-          <rect x="23" y="7" width="3" height="14" fill="#3f6fe0"/>
-          <rect x="5" y="23" width="21" height="2" rx="1" fill="#323a4f"/>
-        </g>
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true" fill="none">
+        <rect x="3" y="5" width="26" height="18" rx="3" stroke="currentColor" stroke-width="2"/>
+        <path d="M11 28h10m-5-5v5M12 14h8m-3-3 3 3-3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
       <span class="brand-name">getScreenShare</span>
     </div>
@@ -69,34 +61,24 @@
   <!-- Entrada -->
   <section id="lobby" class="view">
     <div class="lobby-copy">
-      <h1>Compartilhe sua tela em tempo real</h1>
-      <p class="lead">Entre numa sala, escolha o que mostrar e quem estiver nela assiste com poucos milissegundos de atraso.</p>
+      <span class="eyebrow"><span class="status-dot"></span> DISTÂNCIA É SÓ UM DETALHE</span>
+      <h1>Sua tela.<br />Todo mundo <em>junto.</em></h1>
+      <p class="lead">Um jogo, um filme ou só uma ideia.<br />Abra uma sala e compartilhe o momento.</p>
 
       <form id="join-form" autocomplete="off" novalidate>
         <label class="field">
           <span>Seu nome</span>
-          <input id="name" type="text" maxlength="40" placeholder="Como os outros vão te ver" />
+          <input id="name" type="text" maxlength="40" placeholder="Como te chamam?" />
         </label>
         <label class="field">
           <span>Sala</span>
           <input id="room" type="text" maxlength="64" placeholder="Nome da sala" />
-          <small>Quem digitar o mesmo nome entra na mesma sala.</small>
         </label>
+        <p class="room-help">Mesmo nome de sala, mesmo lugar. Simples assim.</p>
         <p id="lobby-error" class="form-error" role="alert" hidden></p>
         <button id="btn-join" class="btn primary wide" type="submit">Entrar na sala</button>
       </form>
-    </div>
-
-    <div class="lobby-art" aria-hidden="true">
-      <div class="monitor">
-        <div class="testcard">
-          <div class="tc-bars"></div>
-          <div class="tc-mid"></div>
-          <div class="tc-low"><i></i><i></i><i></i><b></b></div>
-        </div>
-        <span class="tally"><i></i>ao vivo</span>
-      </div>
-      <div class="monitor-stand"></div>
+      <p class="lobby-note">TELA + CÂMERA + ÁUDIO <span>/</span> EM TEMPO REAL</p>
     </div>
   </section>
 
@@ -114,20 +96,16 @@
           <h2>Seu envio</h2>
           <span class="live-badge"><i></i>ao vivo</span>
         </div>
+        <p id="own-source" class="hint"></p>
         <dl id="own-stats" class="kv"></dl>
       </section>
     </aside>
 
     <main id="stage">
+      <div class="stage-label"><span class="status-dot"></span> TELAS DA SALA</div>
       <div id="grid"></div>
       <div id="empty" class="empty">
-        <div class="monitor small">
-          <div class="testcard">
-            <div class="tc-bars"></div>
-            <div class="tc-mid"></div>
-            <div class="tc-low"><i></i><i></i><i></i><b></b></div>
-          </div>
-        </div>
+        <div class="empty-icon" aria-hidden="true"><svg class="i"><use href="#i-screen"/></svg><span>_</span></div>
         <h2 id="empty-title">Ninguém está compartilhando</h2>
         <p id="empty-text">Compartilhe sua tela ou espere alguém começar. As telas aparecem aqui.</p>
       </div>
@@ -138,9 +116,13 @@
         <svg class="i"><use href="#i-screen"/></svg>
         Compartilhar tela
       </button>
+      <button id="btn-switch" class="btn primary" type="button" hidden>
+        <svg class="i"><use href="#i-refresh"/></svg>
+        Trocar tela
+      </button>
       <button id="btn-stop" class="btn danger" type="button" hidden>
         <svg class="i"><use href="#i-stop"/></svg>
-        Parar de compartilhar
+        Parar transmissão
       </button>
       <button id="btn-camera" class="btn ghost" type="button">
         <svg class="i"><use href="#i-camera"/></svg>
@@ -161,9 +143,9 @@
   <div id="toasts" role="status" aria-live="polite"></div>
 
   <!-- Escolher o que compartilhar -->
-  <dialog id="picker">
+  <dialog id="picker" aria-labelledby="picker-title" aria-describedby="picker-description">
     <header class="modal-head">
-      <h2>Escolher o que compartilhar</h2>
+      <div><h2 id="picker-title">Escolher o que compartilhar</h2><p id="picker-description" class="hint">Escolha uma tela inteira ou uma janela.</p></div>
       <button id="picker-close" class="icon-btn" type="button" aria-label="Fechar"><svg class="i"><use href="#i-close"/></svg></button>
     </header>
 

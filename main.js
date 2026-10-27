@@ -3,7 +3,7 @@ const path = require('path');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const execFileAsync = promisify(execFile);
-const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, clipboard, Tray, Menu, nativeImage, autoUpdater: nativeUpdater } = require('electron');
 const tokens = require('./token');
 const { autoUpdater } = require('electron-updater');
 
@@ -14,10 +14,14 @@ require('./video-runtime').configureVideoRuntime(app);
 app.setName('getScreenShare');
 if (process.platform === 'win32') app.setAppUserModelId('com.getscreenshare.app');
 
-const BG = '#151a24';
+const BG = '#111315';
 const isWayland = process.platform === 'linux'
   && (process.env.XDG_SESSION_TYPE === 'wayland' || !!process.env.WAYLAND_DISPLAY);
 let win;
+const trayLifecycle = require('./tray-lifecycle').createTrayLifecycle({
+  app, Tray, Menu, nativeImage, nativeUpdater, getWindow: () => win,
+  iconPath: path.join(__dirname, 'build', 'icon.png'),
+});
 
 require('./room-clipboard').registerRoomClipboard({ ipcMain, clipboard, getWindow: () => win });
 
@@ -135,15 +139,17 @@ function createWindow() {
     // Barra de título própria; os botões de minimizar/fechar do Windows ficam por cima.
     ...(process.platform === 'win32' ? {
       titleBarStyle: 'hidden',
-      titleBarOverlay: { color: BG, symbolColor: '#e9ecf4', height: 40 },
+      titleBarOverlay: { color: BG, symbolColor: '#a4dced', height: 40 },
     } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      backgroundThrottling: false,
     },
   });
   win.setMenuBarVisibility(false);
+  trayLifecycle.attachWindow(win);
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
   // A janela só mostra a nossa interface: links externos abrem no navegador.
@@ -361,6 +367,7 @@ ipcMain.handle('get-app-info', () => ({
 
 app.whenReady().then(() => {
   setupDisplayMediaHandler();
+  trayLifecycle.createTray();
   createWindow();
   setupCapturePermissions();
   setupAutoUpdater();

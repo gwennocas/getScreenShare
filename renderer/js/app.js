@@ -5,7 +5,7 @@ const { Room, RoomEvent, Track } = LivekitClient;
 const $ = (id) => document.getElementById(id);
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const ROOM_RE = /^[\p{L}\p{N}_\- ]{1,64}$/u;
-const AVATAR_COLORS = ['#e6c84a', '#4ac2c2', '#5cc060', '#c985e3', '#7da2f0'];
+const AVATAR_COLORS = ['#a4dced', '#e58a95', '#89c7b1', '#b6a7d4', '#a4b9d8'];
 
 const els = {
   lobby: $('lobby'), roomView: $('room-view'), roomChip:$('room-chip'),
@@ -13,9 +13,9 @@ const els = {
   conn: $('conn'), connText:$('conn-text'),
   form: $('join-form'), name: $('name'), room:$('room'), lobbyError: $('lobby-error'), join:$('btn-join'),
   peopleList: $('people-list'), peopleCount:$('people-count'),
-  own: $('own'), ownStats:$('own-stats'),
+  own: $('own'), ownStats:$('own-stats'), ownSource:$('own-source'),
   grid: $('grid'), empty:$('empty'), emptyTitle: $('empty-title'), emptyText:$('empty-text'),
-  share: $('btn-share'), stop: $('btn-stop'), leave:$('btn-leave'),
+  share: $('btn-share'), switch: $('btn-switch'), stop: $('btn-stop'), leave:$('btn-leave'),
   camera: $('btn-camera'), cameraStop: $('btn-camera-stop'),
   cameraPicker: $('camera-picker'), cameraDevice: $('camera-device'), cameraHint: $('camera-hint'),
   cameraDetect: $('camera-detect'),
@@ -23,6 +23,7 @@ const els = {
   cameraPickerClose: $('camera-picker-close'),
   audioSink: $('audio-sink'), toasts: $('toasts'), settingsBtn:$('btn-settings'),
   picker: $('picker'), pickerGrid: $('picker-grid'), pickerHint:$('picker-hint'),
+  pickerTitle: $('picker-title'), pickerDescription: $('picker-description'),
   pickerStart: $('picker-start'), pickerCancel: $('picker-cancel'), pickerClose:$('picker-close'),
   pickerRefresh: $('picker-refresh'), tabScreen: $('tab-screen'), tabWindow:$('tab-window'),
   pkQuality: $('pk-quality'), pkHint: $('pk-hint'), pkAudio:$('pk-audio'),
@@ -43,6 +44,13 @@ let leaving = false;
 let focusedId = null;
 let stopOwnStats = null;
 let localShareTrack = null;
+let shareBusy = false;
+let shareStopping = false;
+let shareGeneration = 0;
+let shareOptions = null;
+let activeSourceId = null;
+let pickerMode = 'start';
+let sourcesGeneration = 0;
 let localCameraTrack = null;
 let cameraBusy = false;
 let pickedSourceId = null;
@@ -225,6 +233,8 @@ async function joinRoom(event) {
 async function leaveRoom() {
   if (!room) return;
   leaving = true;
+  shareGeneration++;
+  if (els.picker.open) els.picker.close();
   await stopCamera();
   await stopExcludedAudioTrack();
   try { await room.disconnect(); } catch (_) { /* ignora */ }
@@ -235,6 +245,10 @@ function cleanupRoom() {
   void stopExcludedAudioTrack();
   if (stopOwnStats) { stopOwnStats(); stopOwnStats = null; }
   localShareTrack = null;
+  shareGeneration++;
+  shareOptions = null;
+  activeSourceId = null;
+  if (els.picker.open) els.picker.close();
   if (localCameraTrack) localCameraTrack.stop();
   localCameraTrack = null;
   cameraBusy = false;
@@ -249,6 +263,7 @@ function cleanupRoom() {
   room = null;
   els.own.hidden = true;
   els.share.hidden = false;
+  els.switch.hidden = true;
   els.stop.hidden = true;
   els.peopleList.replaceChildren();
   updateGrid();
@@ -667,19 +682,32 @@ function onCameraEnded() {
 
 // ---------- Escolher e compartilhar a própria tela ----------
 
-async function openPicker() {
-  if (!room) return;
+async function openPicker(mode = 'start') {
+  if (!room || leaving || shareBusy || shareStopping || els.picker.open) return;
+  if (mode === 'switch' && !localShareTrack) return;
+  pickerMode = mode;
+  const switching = mode === 'switch';
+  pickedSourceId = switching ? activeSourceId : null;
   const s = getSettings();
   els.pkQuality.value = s.quality;
   els.pkHint.value = s.hint;
   els.pkAudio.checked = appPlatform === 'win32' && s.shareAudio;
   els.pkAudio.disabled = appPlatform !== 'win32';
   els.pkAudio.closest('label').hidden = appPlatform !== 'win32';
+  document.querySelector('.picker-opts').hidden = switching;
+  els.pickerTitle.textContent = switching ? 'Trocar tela' : 'Escolher o que compartilhar';
+  els.pickerDescription.textContent = switching
+    ? 'A transmissão atual continua até você confirmar. O áudio será mantido.'
+    : 'Escolha uma tela inteira ou uma janela.';
+  els.pickerStart.textContent = switching ? 'Trocar tela' : 'Começar a compartilhar';
+  els.pickerStart.disabled = true;
+  document.querySelector('.picker-bar').hidden = usesWaylandPortal;
+  els.pickerGrid.hidden = usesWaylandPortal;
   els.picker.showModal();
   if (usesWaylandPortal) {
     document.querySelector('.picker-bar').hidden = true;
     els.pickerGrid.hidden = true;
-    els.pickerHint.textContent = 'Ao começar, escolha a tela ou janela no portal do sistema.';
+    els.pickerHint.textContent = 'Escolha a tela ou janela no portal do sistema ao confirmar.';
     els.pickerStart.disabled = false;
   } else {
     await loadSources();
@@ -687,12 +715,17 @@ async function openPicker() {
 }
 
 async function loadSources() {
+  const generation = ++sourcesGeneration;
+  els.pickerStart.disabled = true;
   els.pickerGrid.replaceChildren(Object.assign(document.createElement('p'), {
     className: 'hint', textContent: 'Procurando telas e janelas',
   }));
   try {
-    pickerSources = await window.api.listSources();
+    const sources = await window.api.listSources();
+    if (generation !== sourcesGeneration || !els.picker.open) return;
+    pickerSources = sources;
   } catch (err) {
+    if (generation !== sourcesGeneration || !els.picker.open) return;
     pickerSources = [];
     els.pickerGrid.replaceChildren(Object.assign(document.createElement('p'), {
       className: 'form-error', textContent: `Não foi possível listar as telas. ${friendlyError(err)}`,
@@ -744,8 +777,10 @@ function renderSources() {
   }
 
   const picked = pickerSources.find((x) => x.id === pickedSourceId);
-  els.pickerStart.disabled = !picked;
-  els.pickerHint.textContent = picked ? `Escolhido: ${picked.name}` : 'Escolha uma tela ou janela para começar.';
+  const currentSource = pickerMode === 'switch' && picked?.id === activeSourceId;
+  els.pickerStart.disabled = shareBusy || !picked || currentSource;
+  els.pickerHint.textContent = currentSource ? 'Essa tela já está sendo compartilhada.'
+    : picked ? `Escolhido: ${picked.name}` : 'Escolha uma tela ou janela.';
 }
 
 
@@ -753,13 +788,23 @@ function renderSources() {
 // publica-o como ScreenShareAudio no LiveKit. A captura já vem com o Discord excluído.
 async function startExcludedAudioTrack() {
   if (!room) throw new Error('Você não está conectado à sala.');
+  const activeRoom = room;
+  const generation = shareGeneration;
+  const ensureCurrent = () => {
+    if (room !== activeRoom || leaving || generation !== shareGeneration || !localShareTrack) {
+      throw new Error('A transmissão foi encerrada.');
+    }
+  };
   await stopExcludedAudioTrack();
+  ensureCurrent();
 
   const context = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
   let node = null;
   let track = null;
+  let published = false;
   try {
     await context.audioWorklet.addModule('./js/pcm-audio-worklet.js');
+    ensureCurrent();
     node = new AudioWorkletNode(context, 'pcm-stream-processor', {
       numberOfInputs: 0,
       numberOfOutputs: 1,
@@ -782,15 +827,22 @@ async function startExcludedAudioTrack() {
     });
 
     await context.resume();
+    ensureCurrent();
     await window.api.startExcludedAudio();
+    ensureCurrent();
     track = destination.stream.getAudioTracks()[0];
     if (!track) throw new Error('Não foi possível criar a faixa de áudio filtrado.');
-    await room.localParticipant.publishTrack(track, { source: Track.Source.ScreenShareAudio });
+    await activeRoom.localParticipant.publishTrack(track, { source: Track.Source.ScreenShareAudio });
+    published = true;
+    ensureCurrent();
 
     excludedAudioContext = context;
     excludedAudioNode = node;
     excludedAudioTrack = track;
   } catch (err) {
+    if (published) {
+      try { await activeRoom.localParticipant.unpublishTrack(track, false); } catch (_) { /* sala encerrada */ }
+    }
     window.api.removeExcludedAudioChunkListener();
     try { await window.api.stopExcludedAudio(); } catch (_) { /* captura pode não ter iniciado */ }
     if (track) { try { track.stop(); } catch (_) { /* ignora */ } }
@@ -825,19 +877,29 @@ async function stopExcludedAudioTrack() {
 }
 
 async function startShare() {
-  if (!room || (!usesWaylandPortal && !pickedSourceId)) return;
+  if (!room || leaving || shareBusy || shareStopping || !els.picker.open || (!usesWaylandPortal && !pickedSourceId)) return;
+  if (pickerMode === 'switch') return switchShare();
+  if (localShareTrack) return;
+  const activeRoom = room;
+  const generation = ++shareGeneration;
+  const sourceId = pickedSourceId;
   const s = getSettings();
   const qualityKey = els.pkQuality.value;
   const hint = els.pkHint.value;
   const withAudio = appPlatform === 'win32' && els.pkAudio.checked;
   const q = QUALITY[qualityKey];
 
+  shareBusy = true;
   els.pickerStart.disabled = true;
+  let publishedTrack = null;
   try {
-    if (!usesWaylandPortal) await window.api.selectSource(pickedSourceId, false);
+    if (!usesWaylandPortal && !await window.api.selectSource(sourceId, false)) {
+      throw new Error('Essa fonte não está mais disponível. Atualize a lista.');
+    }
+    if (room !== activeRoom || leaving || generation !== shareGeneration || !els.picker.open) return;
 
     // Configuração de compartilhamento de tela com suporte otimizado para GPU/Hardware
-    const pub = await room.localParticipant.setScreenShareEnabled(
+    const pub = await activeRoom.localParticipant.setScreenShareEnabled(
       true,
       {
         audio: false, // áudio WASAPI é publicado separadamente no Windows
@@ -852,6 +914,17 @@ async function startShare() {
         degradationPreference: 'maintain-framerate',
       }
     );
+    if (!pub?.track) throw new Error('Não foi possível publicar a tela.');
+    publishedTrack = pub.track;
+    if (room !== activeRoom || leaving || generation !== shareGeneration || !els.picker.open) {
+      try { await activeRoom.localParticipant.unpublishTrack(publishedTrack); } catch (_) { /* sala encerrada */ }
+      publishedTrack.stop();
+      return;
+    }
+    localShareTrack = publishedTrack;
+    shareOptions = { quality: qualityKey, hint };
+    activeSourceId = sourceId;
+    watchShareCapture(publishedTrack, publishedTrack.mediaStreamTrack);
     let audioError = '';
     if (withAudio) {
       try {
@@ -861,17 +934,17 @@ async function startShare() {
         audioError = friendlyError(err);
       }
     }
+    if (room !== activeRoom || leaving || generation !== shareGeneration || localShareTrack !== publishedTrack) return;
     saveSettings({ quality: qualityKey, hint, shareAudio: withAudio });
     els.picker.close();
 
-    if (pub && pub.track) {
-      localShareTrack = pub.track;
-      if (stopOwnStats) stopOwnStats();
-      stopOwnStats = pollSenderStats(pub.track, (rows) => renderKv(els.ownStats, rows));
-    }
+    if (stopOwnStats) stopOwnStats();
+    stopOwnStats = pollSenderStats(publishedTrack, (rows) => renderKv(els.ownStats, rows));
+    els.ownSource.textContent = pickerSources.find((source) => source.id === sourceId)?.name || 'Tela do sistema';
     els.own.hidden = false;
     els.ownStats.hidden = !getSettings().showStats;
     els.share.hidden = true;
+    els.switch.hidden = false;
     els.stop.hidden = false;
     updateGrid();
     renderPeople();
@@ -880,24 +953,126 @@ async function startShare() {
       : 'Você está compartilhando a tela', { kind: audioError ? 'warn' : 'ok' });
   } catch (err) {
     console.error(err);
+    if (room !== activeRoom || generation !== shareGeneration) return;
+    if (publishedTrack) {
+      try { await activeRoom.localParticipant.unpublishTrack(publishedTrack); } catch (_) { /* desconectado */ }
+      publishedTrack.stop();
+      onShareEnded();
+    }
     toast(`Não foi possível compartilhar. ${friendlyError(err)}`, { kind: 'error' });
-    els.pickerStart.disabled = false;
+  } finally {
+    shareBusy = false;
+    if (els.picker.open) {
+      if (usesWaylandPortal) els.pickerStart.disabled = false;
+      else renderSources();
+    }
+  }
+}
+
+function watchShareCapture(track, capture) {
+  capture.addEventListener('ended', () => {
+    if (localShareTrack === track && track.mediaStreamTrack === capture) void stopShare();
+  }, { once: true });
+}
+
+async function switchShare() {
+  const activeRoom = room;
+  const track = localShareTrack;
+  if (!activeRoom || !track || leaving || shareBusy || !shareOptions || !els.picker.open) return;
+  const generation = ++shareGeneration;
+  const sourceId = pickedSourceId;
+  if (!usesWaylandPortal && (!sourceId || sourceId === activeSourceId)) return;
+  const previousCapture = track.mediaStreamTrack;
+  const q = QUALITY[shareOptions.quality];
+  const hint = shareOptions.hint;
+  const isCurrent = () => room === activeRoom && !leaving
+    && localShareTrack === track && generation === shareGeneration;
+  let stream;
+  let replacement;
+  shareBusy = true;
+  els.pickerStart.disabled = true;
+  els.switch.disabled = true;
+  try {
+    if (!usesWaylandPortal && !await window.api.selectSource(sourceId, false)) {
+      throw new Error('Essa fonte não está mais disponível. Atualize a lista.');
+    }
+    if (!isCurrent() || !els.picker.open) return;
+    stream = await navigator.mediaDevices.getDisplayMedia({
+      audio: false,
+      video: {
+        width: { max: q.width }, height: { max: q.height },
+        frameRate: { ideal: q.fps, max: q.fps },
+      },
+    });
+    replacement = stream.getVideoTracks()[0];
+    if (!replacement || replacement.readyState === 'ended') throw new Error('A nova captura não está disponível.');
+    if (!isCurrent() || !els.picker.open) return;
+    replacement.contentHint = hint;
+    // Mantém a publicação, o sender e a faixa de áudio. O SDK só para a
+    // captura anterior depois que o sender aceita a nova faixa de vídeo.
+    await track.replaceTrack(replacement, false);
+    if (!isCurrent()) return;
+    watchShareCapture(track, replacement);
+    activeSourceId = sourceId;
+    els.ownSource.textContent = pickerSources.find((source) => source.id === sourceId)?.name
+      || replacement.label || 'Tela do sistema';
+    if (els.picker.open) els.picker.close();
+    toast('Tela trocada. A transmissão continua.', { kind: 'ok' });
+  } catch (err) {
+    if (!isCurrent()) return;
+    // replaceTrack pode concluir a troca e falhar apenas ao atualizar os
+    // parâmetros do encoder. Nesse caso, a nova captura já está em uso.
+    if (replacement && track.mediaStreamTrack === replacement) {
+      watchShareCapture(track, replacement);
+      activeSourceId = sourceId;
+      els.ownSource.textContent = replacement.label || 'Tela do sistema';
+      if (els.picker.open) els.picker.close();
+      toast('Tela trocada; não foi possível ajustar o encoder. Confira seu envio.', { kind: 'warn' });
+    } else if (err.name !== 'NotAllowedError' && err.name !== 'AbortError') {
+      console.error(err);
+      toast(`Não foi possível trocar a tela. A transmissão atual continua. ${friendlyError(err)}`, { kind: 'error' });
+    }
+  } finally {
+    // Também libera capturas que chegaram depois de cancelar ou sair da sala.
+    stream?.getTracks().forEach((capture) => {
+      if (!isCurrent() || capture !== track.mediaStreamTrack) capture.stop();
+    });
+    if (track.mediaStreamTrack !== previousCapture) previousCapture.stop();
+    shareBusy = false;
+    els.switch.disabled = false;
+    if (els.picker.open) {
+      if (usesWaylandPortal) els.pickerStart.disabled = false;
+      else renderSources();
+    }
   }
 }
 
 async function stopShare() {
-  if (room) {
-    try { await room.localParticipant.setScreenShareEnabled(false); } catch (_) { /* ignora */ }
-  }
+  if (shareStopping) return;
+  shareStopping = true;
+  const activeRoom = room;
+  els.share.disabled = true;
   onShareEnded();
+  try {
+    if (activeRoom) await activeRoom.localParticipant.setScreenShareEnabled(false);
+  } catch (_) { /* a publicação pode já ter sido removida */ }
+  finally {
+    shareStopping = false;
+    els.share.disabled = false;
+  }
 }
 
 function onShareEnded() {
   void stopExcludedAudioTrack();
   if (stopOwnStats) { stopOwnStats(); stopOwnStats = null; }
   localShareTrack = null;
+  shareGeneration++;
+  shareOptions = null;
+  activeSourceId = null;
+  if (els.picker.open) els.picker.close();
   els.own.hidden = true;
   els.share.hidden = false;
+  els.switch.hidden = true;
   els.stop.hidden = true;
   updateGrid();
 }
@@ -1047,7 +1222,8 @@ function init() {
 
   els.form.addEventListener('submit', joinRoom);
   els.leave.addEventListener('click', leaveRoom);
-  els.share.addEventListener('click', openPicker);
+  els.share.addEventListener('click', () => openPicker('start'));
+  els.switch.addEventListener('click', () => openPicker('switch'));
   els.stop.addEventListener('click', stopShare);
   els.camera.addEventListener('click', openCameraPicker);
   els.cameraStop.addEventListener('click', stopCamera);
