@@ -7,6 +7,8 @@ Durante o compartilhamento, use **Trocar tela** para escolher outra tela ou jane
 
 O botão **X** esconde a janela na bandeja do sistema e mantém a sala, a tela, a câmera e o áudio funcionando. Clique no ícone da bandeja ou em **Abrir getScreenShare** no menu dele para voltar. Para encerrar o aplicativo e a transmissão, escolha **Sair** nesse menu. Se o ícone da bandeja não puder ser criado, o **X** fecha normalmente.
 
+O app mantém uma única instância por perfil. Abrir o executável ou o atalho novamente restaura a janela existente, mesmo se ela estiver na bandeja, sem criar outra sala ou outro ícone. Isso também vale para `npm start`. O Electron continua usando processos auxiliares para renderização, GPU e mídia.
+
 Na sala, **Ligar câmera** permite escolher uma câmera disponível e publicá-la ao lado das telas. Se uma câmera não aparecer na lista, use **Detectar outras câmeras** para autorizar o acesso e atualizar os dispositivos. A câmera pode continuar ligada enquanto você compartilha a tela. **Desligar câmera** interrompe a captura; o microfone não é ativado.
 
 ## Instalar
@@ -36,7 +38,7 @@ A captura Wayland e a codificação por GPU foram confirmadas em Arch Linux com 
 4. Configure um servidor de tokens conforme as instruções abaixo, ou obtenha a URL e o código de acesso de quem já hospeda um.
 5. Rode `npm start` e informe a URL e o código em **Configurações → Geral → Conexão**.
 
-Para testar sozinha, abra duas janelas do app (dois terminais com `npm start`), entre na mesma sala nas duas e compartilhe numa delas. Deixe "Compartilhar o áudio do computador" desmarcado nesse teste, senão o som volta em loop.
+Para testar a transmissão, abra o app em dois computadores, entre na mesma sala nos dois e compartilhe a tela em um deles. Deixe "Compartilhar o áudio do computador" desmarcado se os computadores reproduzirem o mesmo áudio no ambiente, para evitar retorno.
 
 ## Usar com amigos: servidor de tokens
 
@@ -123,6 +125,7 @@ Se aparecer "processador", teste desligar o simulcast nas configurações e comp
 
 - `main.js`: janela, lista de telas, captura e tokens
 - `tray-lifecycle.js`: bandeja do sistema, reabertura e encerramento do aplicativo
+- `single-instance.js`: impede cópias adicionais e reabre a instância existente
 - `video-runtime.js`: inicialização da codificação VA-API no Linux
 - `test/`: testes da configuração de vídeo
 - `.github/workflows/release.yml`: pacotes Windows e Linux para Releases

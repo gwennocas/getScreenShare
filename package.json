@@ -1,6 +1,6 @@
 {
   "name": "getscreenshare",
-  "version": "0.2.9",
+  "version": "0.3.0",
   "description": "Compartilhamento de tela em tempo real (Electron + LiveKit)",
   "main": "main.js",
   "author": "getScreenShare",
@@ -35,6 +35,7 @@
       "video-runtime.js",
       "room-clipboard.js",
       "tray-lifecycle.js",
+      "single-instance.js",
       "preload.js",
       "token.js",
       "renderer/**/*",
