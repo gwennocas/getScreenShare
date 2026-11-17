@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Prova de captura</title><link rel="stylesheet" href="style.css"></head>
+<body>
+  <main>
+    <h1>Prova de captura</h1>
+    <p>Verifique se esta WebView consegue capturar e mostrar a tela selecionada.</p>
+    <button id="start" type="button">Selecionar tela ou janela</button>
+    <button id="stop" type="button" disabled>Parar</button>
+    <p id="status" role="status">Nenhuma captura ativa.</p>
+    <video id="preview" autoplay muted playsinline></video>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

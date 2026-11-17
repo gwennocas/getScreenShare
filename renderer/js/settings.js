@@ -25,10 +25,11 @@ const DEFAULT_SETTINGS = {
 
 let currentSettings = { ...DEFAULT_SETTINGS };
 
-function loadSettings() {
+function loadSettings(imported = {}) {
+  currentSettings = { ...DEFAULT_SETTINGS, ...imported };
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) currentSettings = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    if (raw) currentSettings = { ...currentSettings, ...JSON.parse(raw) };
   } catch (_) { /* sem armazenamento: usa os padrões */ }
   // Descarta o modo de autenticação antigo, preservando URL e preferências.
   delete currentSettings.tokenMode;
@@ -43,7 +44,9 @@ function getSettings() {
 function saveSettings(patch) {
   currentSettings = { ...currentSettings, ...patch };
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(currentSettings));
+    const stored = { ...currentSettings };
+    if (window.api?.loadLegacySettings) delete stored.accessCode;
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(stored));
   } catch (_) { /* ignora */ }
   if (window.api?.exportNativeSettings) void window.api.exportNativeSettings(currentSettings).catch(() => {});
   return currentSettings;

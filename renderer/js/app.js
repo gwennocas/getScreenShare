@@ -58,6 +58,7 @@ let pickerKind = 'screen';
 let pickerSources = [];
 let appPlatform = 'unknown';
 let usesWaylandPortal = false;
+let usesSystemPicker = false;
 let excludedAudioContext = null;
 let excludedAudioNode = null;
 let excludedAudioTrack = null;
@@ -701,13 +702,15 @@ async function openPicker(mode = 'start') {
     : 'Escolha uma tela inteira ou uma janela.';
   els.pickerStart.textContent = switching ? 'Trocar tela' : 'Começar a compartilhar';
   els.pickerStart.disabled = true;
-  document.querySelector('.picker-bar').hidden = usesWaylandPortal;
-  els.pickerGrid.hidden = usesWaylandPortal;
+  document.querySelector('.picker-bar').hidden = usesWaylandPortal || usesSystemPicker;
+  els.pickerGrid.hidden = usesWaylandPortal || usesSystemPicker;
   els.picker.showModal();
-  if (usesWaylandPortal) {
+  if (usesWaylandPortal || usesSystemPicker) {
     document.querySelector('.picker-bar').hidden = true;
     els.pickerGrid.hidden = true;
-    els.pickerHint.textContent = 'Escolha a tela ou janela no portal do sistema ao confirmar.';
+    els.pickerHint.textContent = usesWaylandPortal
+      ? 'Escolha a tela ou janela no portal do sistema ao confirmar.'
+      : 'O seletor do sistema será aberto ao confirmar.';
     els.pickerStart.disabled = false;
   } else {
     await loadSources();
@@ -877,7 +880,7 @@ async function stopExcludedAudioTrack() {
 }
 
 async function startShare() {
-  if (!room || leaving || shareBusy || shareStopping || !els.picker.open || (!usesWaylandPortal && !pickedSourceId)) return;
+  if (!room || leaving || shareBusy || shareStopping || !els.picker.open || (!usesWaylandPortal && !usesSystemPicker && !pickedSourceId)) return;
   if (pickerMode === 'switch') return switchShare();
   if (localShareTrack) return;
   const activeRoom = room;
@@ -893,7 +896,7 @@ async function startShare() {
   els.pickerStart.disabled = true;
   let publishedTrack = null;
   try {
-    if (!usesWaylandPortal && !await window.api.selectSource(sourceId, false)) {
+    if (!usesWaylandPortal && !usesSystemPicker && !await window.api.selectSource(sourceId, false)) {
       throw new Error('Essa fonte não está mais disponível. Atualize a lista.');
     }
     if (room !== activeRoom || leaving || generation !== shareGeneration || !els.picker.open) return;
@@ -940,7 +943,8 @@ async function startShare() {
 
     if (stopOwnStats) stopOwnStats();
     stopOwnStats = pollSenderStats(publishedTrack, (rows) => renderKv(els.ownStats, rows));
-    els.ownSource.textContent = pickerSources.find((source) => source.id === sourceId)?.name || 'Tela do sistema';
+    els.ownSource.textContent = pickerSources.find((source) => source.id === sourceId)?.name
+      || publishedTrack.mediaStreamTrack.label || 'Tela do sistema';
     els.own.hidden = false;
     els.ownStats.hidden = !getSettings().showStats;
     els.share.hidden = true;
@@ -963,7 +967,7 @@ async function startShare() {
   } finally {
     shareBusy = false;
     if (els.picker.open) {
-      if (usesWaylandPortal) els.pickerStart.disabled = false;
+      if (usesWaylandPortal || usesSystemPicker) els.pickerStart.disabled = false;
       else renderSources();
     }
   }
@@ -981,7 +985,7 @@ async function switchShare() {
   if (!activeRoom || !track || leaving || shareBusy || !shareOptions || !els.picker.open) return;
   const generation = ++shareGeneration;
   const sourceId = pickedSourceId;
-  if (!usesWaylandPortal && (!sourceId || sourceId === activeSourceId)) return;
+  if (!usesWaylandPortal && !usesSystemPicker && (!sourceId || sourceId === activeSourceId)) return;
   const previousCapture = track.mediaStreamTrack;
   const q = QUALITY[shareOptions.quality];
   const hint = shareOptions.hint;
@@ -993,7 +997,7 @@ async function switchShare() {
   els.pickerStart.disabled = true;
   els.switch.disabled = true;
   try {
-    if (!usesWaylandPortal && !await window.api.selectSource(sourceId, false)) {
+    if (!usesWaylandPortal && !usesSystemPicker && !await window.api.selectSource(sourceId, false)) {
       throw new Error('Essa fonte não está mais disponível. Atualize a lista.');
     }
     if (!isCurrent() || !els.picker.open) return;
@@ -1041,7 +1045,7 @@ async function switchShare() {
     shareBusy = false;
     els.switch.disabled = false;
     if (els.picker.open) {
-      if (usesWaylandPortal) els.pickerStart.disabled = false;
+      if (usesWaylandPortal || usesSystemPicker) els.pickerStart.disabled = false;
       else renderSources();
     }
   }
@@ -1185,7 +1189,10 @@ function bindSettings() {
     els.ownStats.hidden = !els.stStats.checked;
   });
   els.stCheck.addEventListener('click', checkServer);
-  els.stGpu.addEventListener('click', () => window.api.openGpuDiagnostics());
+  els.stGpu.addEventListener('click', async () => {
+    const opened = await window.api.openGpuDiagnostics();
+    if (!opened) toast('Confira o encoder e a codificação em Seu envio durante a transmissão.');
+  });
 
   els.stUpdateCheck.addEventListener('click', async () => {
     try {
@@ -1215,8 +1222,8 @@ function closeOnBackdrop(dialog) {
   dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); });
 }
 
-function init() {
-  const s = loadSettings();
+function init(importedSettings) {
+  const s = loadSettings(importedSettings);
   els.name.value = s.name;
   els.room.value = s.room;
 
@@ -1261,10 +1268,21 @@ function init() {
     window.api.getAppInfo().then((info) => {
       appPlatform = info.platform;
       usesWaylandPortal = !!info.isWayland;
+      usesSystemPicker = !!info.usesSystemPicker;
       els.appVersion.textContent = `Versão ${info.version}`;
       if (els.stUpdateVersion) els.stUpdateVersion.textContent = `Versão instalada: ${info.version}`;
     }).catch(() => {});
   }
 }
 
-init();
+async function startApp() {
+  let importedSettings;
+  if (window.api?.loadLegacySettings) {
+    try {
+      importedSettings = await window.api.loadLegacySettings();
+    } catch (_) { /* a sala continua disponível se a importação falhar */ }
+  }
+  init(importedSettings);
+}
+
+if (window.api?.onUpdaterStatus) void startApp();

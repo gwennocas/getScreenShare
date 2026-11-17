@@ -54,6 +54,7 @@ button { cursor: pointer; }
   -webkit-app-region: drag;
   user-select: none;
 }
+body[data-shell="tauri"] #topbar { padding-right: 20px; }
 #topbar button, #topbar .conn { -webkit-app-region: no-drag; }
 .spacer { flex: 1; }
 
