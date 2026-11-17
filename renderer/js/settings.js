@@ -45,5 +45,6 @@ function saveSettings(patch) {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(currentSettings));
   } catch (_) { /* ignora */ }
+  if (window.api?.exportNativeSettings) void window.api.exportNativeSettings(currentSettings).catch(() => {});
   return currentSettings;
 }

@@ -3,6 +3,10 @@
 App de desktop para compartilhar a tela em tempo real, feito com Electron e WebRTC (LiveKit).
 Cada pessoa entra numa sala pelo nome, escolhe uma tela ou janela e os participantes assistem em tempo real. A latência depende da rede, do codec e do dispositivo.
 
+## Cliente nativo Rust para Windows (experimental)
+
+Há um cliente nativo para Windows em [`experiments/egui-probe`](experiments/egui-probe/README.md). Ele usa egui, mantém o servidor de tokens e o LiveKit e inclui compartilhamento de tela/janela, câmera, áudio, troca de fonte, zoom da tela recebida, bandeja, estatísticas, atualização pelo app e migração de configurações. O Electron continua sendo a versão para Linux; o cliente Rust é publicado como executável separado nas Releases. Em uma medição ociosa neste computador, o Rust usou cerca de 67% menos RAM que o Electron; a comparação durante uma transmissão ainda falta. Consulte o README do cliente Rust antes de compilá-lo.
+
 Durante o compartilhamento, use **Trocar tela** para escolher outra tela ou janela sem parar a transmissão. Confirme a nova fonte no seletor; o áudio, a câmera e a qualidade atual são mantidos. No Wayland, a escolha acontece no portal do sistema. Se cancelar a escolha ou a nova captura falhar, a fonte atual continua sendo transmitida.
 
 O botão **X** esconde a janela na bandeja do sistema e mantém a sala, a tela, a câmera e o áudio funcionando. Clique no ícone da bandeja ou em **Abrir getScreenShare** no menu dele para voltar. Para encerrar o aplicativo e a transmissão, escolha **Sair** nesse menu. Se o ícone da bandeja não puder ser criado, o **X** fecha normalmente.
@@ -16,6 +20,7 @@ Na sala, **Ligar câmera** permite escolher uma câmera disponível e publicá-l
 Baixe a versão desejada em [Releases](https://github.com/gwennocas/getScreenShare/releases).
 
 - **Windows x64:** execute `getScreenShare-Setup-VERSÃO.exe`.
+- **Cliente nativo Windows (experimental):** baixe `getScreenShare-Rust-vVERSÃO-windows-x86_64.exe` para usar a versão Rust/egui sem Electron.
 - **Linux x64:** baixe `getScreenShare-VERSÃO-linux-x86_64.AppImage`, permita a execução nas propriedades do arquivo e abra-o. Pelo terminal, use `chmod +x getScreenShare-*.AppImage` e execute o arquivo baixado. Algumas distribuições precisam do pacote de compatibilidade do FUSE 2 para abrir AppImages.
 
 Na primeira execução, configure a URL do servidor de tokens e o código de acesso em **Configurações → Geral → Conexão**.
@@ -68,7 +73,7 @@ No Linux, rode `npm run dist` para gerar o AppImage ou `npm run dist:deb` para g
 
 ### Publicar uma versão
 
-1. Atualize `version` em `package.json` e `package-lock.json`, execute `npm test` e envie as alterações ao repositório.
+1. Atualize a versão em `package.json`, `package-lock.json`, `experiments/egui-probe/Cargo.toml` e `Cargo.lock`; execute `npm test`, `cargo test` e compile o cliente Rust.
 2. No GitHub, crie uma release com a tag `vVERSÃO`, apontando para o commit da versão.
 3. Ao publicar a release, o workflow `.github/workflows/release.yml` gera o instalador Windows e o AppImage Linux e anexa os pacotes e metadados de atualização. Acompanhe a execução na aba **Actions**; os downloads ficam prontos quando o workflow terminar.
 
