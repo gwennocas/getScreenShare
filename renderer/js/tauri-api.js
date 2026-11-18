@@ -47,7 +47,7 @@ if (!window.api && window.__TAURI__) {
       if (audioListener) void audioListener.then((unlisten) => unlisten());
       audioListener = null;
     },
-    getToken: (params) => invoke('get_token', params),
+    getToken: (params) => invoke('get_token', { params }),
     loadLegacySettings: () => invoke('load_legacy_settings'),
     exportNativeSettings: (settings) => invoke('save_native_settings', { settings }),
     checkServer: (serverUrl) => invoke('check_server', { serverUrl }),
