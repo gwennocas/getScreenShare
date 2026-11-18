@@ -57,6 +57,16 @@ button { cursor: pointer; }
 body[data-shell="tauri"] #topbar { padding-right: 20px; }
 #topbar button, #topbar .conn { -webkit-app-region: no-drag; }
 .spacer { flex: 1; }
+.window-controls { display: none; align-self: stretch; margin-left: 2px; }
+body[data-shell="tauri"] .window-controls { display: flex; }
+.window-control {
+  display: grid; place-items: center;
+  width: 40px; height: 39px; padding: 0;
+  background: transparent; border: 0; color: var(--muted);
+}
+.window-control:hover { background: var(--raised); color: var(--text); }
+.window-control.close:hover { background: #c42b1c; color: white; }
+.window-control .i { width: 15px; height: 15px; }
 
 .brand { display: flex; align-items: center; gap: 9px; }
 .logo { width: 23px; height: 23px; color: var(--live); }

@@ -61,7 +61,23 @@ jobs:
           Copy-Item -LiteralPath $built.FullName -Destination $asset
           $hash = (Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash.ToLowerInvariant()
           [IO.File]::WriteAllText("$asset.sha256", $hash, [Text.UTF8Encoding]::new($false))
-          gh release upload $env:RELEASE_TAG $asset "$asset.sha256" --clobber
+          $sha512 = [Convert]::ToBase64String([Security.Cryptography.SHA512]::HashData([IO.File]::ReadAllBytes($asset)))
+          $size = (Get-Item -LiteralPath $asset).Length
+          $version = $env:RELEASE_TAG -replace '^v', ''
+          $name = [IO.Path]::GetFileName($asset)
+          $releaseDate = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ss.fffZ')
+          $metadata = @(
+            "version: $version"
+            'files:'
+            "  - url: $name"
+            "    sha512: $sha512"
+            "    size: $size"
+            "path: $name"
+            "sha512: $sha512"
+            "releaseDate: $releaseDate"
+          ) -join "`n"
+          [IO.File]::WriteAllText((Join-Path $env:RUNNER_TEMP 'latest.yml'), "$metadata`n", [Text.UTF8Encoding]::new($false))
+          gh release upload $env:RELEASE_TAG $asset "$asset.sha256" (Join-Path $env:RUNNER_TEMP 'latest.yml') --clobber
 
   linux:
     needs: validate

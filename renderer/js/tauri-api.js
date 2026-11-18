@@ -11,6 +11,25 @@ if (!window.api && window.__TAURI__) {
       void currentWindow.startDragging();
     }
   });
+  document.getElementById('btn-window-minimize').addEventListener('click', () => {
+    void currentWindow.minimize();
+  });
+  document.getElementById('btn-window-maximize').addEventListener('click', () => {
+    void currentWindow.toggleMaximize();
+  });
+  document.getElementById('btn-window-close').addEventListener('click', () => {
+    void currentWindow.close();
+  });
+  const maximizeButton = document.getElementById('btn-window-maximize');
+  const syncMaximizeButton = async () => {
+    const maximized = await currentWindow.isMaximized();
+    const label = maximized ? 'Restaurar' : 'Maximizar';
+    maximizeButton.setAttribute('aria-label', label);
+    maximizeButton.title = label;
+    maximizeButton.querySelector('use').setAttribute('href', maximized ? '#i-restore' : '#i-maximize');
+  };
+  void syncMaximizeButton();
+  void currentWindow.onResized(() => { void syncMaximizeButton(); });
 
   window.api = {
     copyRoomName: (roomName) => navigator.clipboard.writeText(roomName),
