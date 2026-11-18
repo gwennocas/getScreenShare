@@ -1,6 +1,6 @@
 {
   "name": "getscreenshare",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "Compartilhamento de tela em tempo real (Tauri + LiveKit)",
   "main": "main.js",
   "author": "getScreenShare",

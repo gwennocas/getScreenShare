@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::{
     fs,
@@ -8,7 +7,9 @@ use std::{
     time::Duration,
 };
 
-const RELEASES: &str = "https://api.github.com/repos/gwennocas/getScreenShare/releases/latest";
+const LATEST_MANIFEST: &str =
+    "https://github.com/gwennocas/getScreenShare/releases/latest/download/latest.yml";
+const RELEASE_DOWNLOADS: &str = "https://github.com/gwennocas/getScreenShare/releases/download";
 const MAX_UPDATE_BYTES: usize = 300 * 1024 * 1024;
 
 #[derive(Clone)]
@@ -18,38 +19,28 @@ pub struct Available {
     checksum_url: String,
 }
 
-#[derive(Deserialize)]
-struct Release {
-    tag_name: String,
-    draft: bool,
-    prerelease: bool,
-    assets: Vec<Asset>,
-}
-
-#[derive(Deserialize)]
-struct Asset {
-    name: String,
-    browser_download_url: String,
+fn manifest_version(manifest: &str) -> Option<&str> {
+    manifest
+        .lines()
+        .find_map(|line| {
+            let (key, value) = line.split_once(':')?;
+            (key.trim() == "version").then_some(value.trim())
+        })
+        .filter(|version| !version.is_empty())
 }
 
 pub async fn check() -> Result<Option<Available>, String> {
-    let release: Release = client()?
-        .get(RELEASES)
+    let manifest = client()?
+        .get(LATEST_MANIFEST)
         .send()
         .await
         .map_err(|_| "Não foi possível consultar as atualizações no GitHub.".to_string())?
         .error_for_status()
         .map_err(|_| "O GitHub não retornou uma versão disponível.".to_string())?
-        .json()
+        .text()
         .await
         .map_err(|_| "A resposta de atualização é inválida.".to_string())?;
-    if release.draft || release.prerelease {
-        return Err("A versão publicada não é uma versão estável.".into());
-    }
-    let latest = release
-        .tag_name
-        .strip_prefix('v')
-        .unwrap_or(&release.tag_name);
+    let latest = manifest_version(&manifest).ok_or("A resposta de atualização é inválida.")?;
     let latest = semver::Version::parse(latest)
         .map_err(|_| "A versão publicada tem um formato inválido.".to_string())?;
     let current = semver::Version::parse(env!("CARGO_PKG_VERSION"))
@@ -57,19 +48,14 @@ pub async fn check() -> Result<Option<Available>, String> {
     if latest <= current {
         return Ok(None);
     }
-    let installer = format!("getScreenShare-Tauri-Setup-{}.exe", release.tag_name);
-    let checksum = format!("{installer}.sha256");
-    let find = |name: &str| {
-        release
-            .assets
-            .iter()
-            .find(|asset| asset.name == name)
-            .map(|asset| asset.browser_download_url.clone())
-    };
+    let version = latest.to_string();
+    let tag = format!("v{version}");
+    let installer = format!("getScreenShare-Tauri-Setup-{tag}.exe");
+    let release_url = format!("{RELEASE_DOWNLOADS}/{tag}");
     Ok(Some(Available {
-        version: latest.to_string(),
-        download_url: find(&installer).ok_or("A versão nova ainda não tem instalador Windows.")?,
-        checksum_url: find(&checksum).ok_or("A versão nova ainda não tem verificação SHA-256.")?,
+        version,
+        download_url: format!("{release_url}/{installer}"),
+        checksum_url: format!("{release_url}/{installer}.sha256"),
     }))
 }
 
@@ -198,4 +184,15 @@ fn checksum_matches(bytes: &[u8], expected: &str) -> bool {
 
 fn quote_powershell(path: &Path) -> String {
     format!("'{}'", path.to_string_lossy().replace('\'', "''"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::manifest_version;
+
+    #[test]
+    fn reads_version_from_release_manifest() {
+        assert_eq!(manifest_version("version: 0.4.4\nfiles:\n"), Some("0.4.4"));
+        assert_eq!(manifest_version("files:\n"), None);
+    }
 }
