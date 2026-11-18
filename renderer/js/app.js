@@ -1195,8 +1195,9 @@ function bindSettings() {
   });
 
   els.stUpdateCheck.addEventListener('click', async () => {
+    renderUpdaterStatus({ ...updaterUiState, status: 'checking', error: null, percent: 0 });
     try {
-      await window.api.checkForUpdates();
+      renderUpdaterStatus(await window.api.checkForUpdates());
     } catch (err) {
       renderUpdaterStatus({ status: 'error', currentVersion: updaterUiState.currentVersion, error: friendlyError(err) });
     }
