@@ -3,6 +3,7 @@
 const SETTINGS_KEY = 'getscreenshare.settings.v1';
 
 const QUALITY = {
+  'source60': { width: 0, height: 0, fps: 60, bitrate: 12_000_000 },
   '1080p60': { width: 1920, height: 1080, fps: 60, bitrate: 6_000_000 },
   '1080p30': { width: 1920, height: 1080, fps: 30, bitrate: 4_000_000 },
   '720p60':  { width: 1280, height: 720,  fps: 60, bitrate: 3_500_000 },
