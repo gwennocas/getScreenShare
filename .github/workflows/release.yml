@@ -1,4 +1,4 @@
-name: Build Tauri releases
+name: Build desktop releases
 
 on:
   release:
@@ -91,25 +91,15 @@ jobs:
           node-version: '24'
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install Tauri Linux dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev
       - run: npm ci
-      - name: Install Tauri CLI
-        run: cargo install tauri-cli --version "^2" --locked
-      - name: Build AppImage
-        working-directory: experiments/tauri-capture
-        run: cargo tauri build --bundles appimage
-        env:
-          CARGO_TARGET_DIR: ${{ runner.temp }}/gss-tauri
+      - name: Build Electron AppImage
+        run: npm run dist:linux
       - name: Upload Linux AppImage
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
-          CARGO_TARGET_DIR: ${{ runner.temp }}/gss-tauri
         run: |
-          built=$(find "$CARGO_TARGET_DIR/release/bundle/appimage" -maxdepth 1 -type f -name '*.AppImage' -print -quit)
+          built=$(find dist -maxdepth 1 -type f -name '*.AppImage' -print -quit)
           test -n "$built"
           asset="$RUNNER_TEMP/getScreenShare-$RELEASE_TAG-linux-x86_64.AppImage"
           cp "$built" "$asset"
