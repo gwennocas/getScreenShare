@@ -1,18 +1,20 @@
 {
   "name": "getscreenshare",
-  "version": "0.4.5",
-  "description": "Compartilhamento de tela em tempo real (Tauri + LiveKit)",
+  "version": "0.4.6",
+  "description": "Compartilhamento de tela em tempo real (Tauri, Electron e LiveKit)",
   "main": "main.js",
+  "desktopName": "getScreenShare",
   "author": "getScreenShare",
   "license": "MIT",
   "scripts": {
     "start": "cd experiments/tauri-capture && cargo tauri dev",
     "server": "node server/index.js",
+    "electron:dev": "electron .",
     "dist": "cd experiments/tauri-capture && cargo tauri build",
     "dist:win": "cd experiments/tauri-capture && cargo tauri build --bundles nsis",
     "dist:deb": "cd experiments/tauri-capture && cargo tauri build --bundles deb",
     "test": "node --test test/*.test.js",
-    "dist:linux": "cd experiments/tauri-capture && cargo tauri build --bundles appimage",
+    "dist:linux": "electron-builder --linux AppImage",
     "tauri:prepare": "node scripts/prepare-tauri-frontend.js",
     "tauri:dev": "cd experiments/tauri-capture && cargo tauri dev",
     "tauri:build": "cd experiments/tauri-capture && cargo tauri build"
@@ -71,6 +73,7 @@
       "target": [
         "AppImage"
       ],
+      "syncDesktopName": true,
       "category": "AudioVideo",
       "icon": "build/icon.png",
       "maintainer": "gwennocas <gwennocas@users.noreply.github.com>",
