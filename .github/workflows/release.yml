@@ -93,7 +93,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: npm ci
       - name: Build Electron AppImage
-        run: npm run dist:linux
+        run: npm run dist:linux -- --publish never
       - name: Upload Linux AppImage
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
