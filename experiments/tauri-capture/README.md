@@ -1,6 +1,8 @@
 # Cliente Tauri
 
-Esta pasta contém o novo shell desktop de getScreenShare. Ele reutiliza o renderer LiveKit em `renderer/`, apresenta a interface Material 3 e usa o seletor de captura do WebView. No Windows, o loopback WASAPI com exclusão da árvore do Discord reutiliza o módulo do cliente Rust anterior. As configurações locais são protegidas com DPAPI e importadas do cliente egui ou do Electron.
+Esta pasta contém o shell Tauri desktop de getScreenShare, usado no Windows. Ele reutiliza o renderer LiveKit em `renderer/`, apresenta a interface Material 3 e usa o seletor de captura do WebView. No Windows, o loopback WASAPI com exclusão da árvore do Discord reutiliza o módulo do cliente Rust anterior. As configurações locais são protegidas com DPAPI e importadas do cliente egui ou do Electron.
+
+No Linux, o AppImage de produção usa Electron/Chromium: o WebKitGTK do Tauri não disponibiliza `RTCPeerConnection` para o LiveKit e não consegue entrar em salas.
 
 ## Desenvolvimento
 
