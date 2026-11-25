@@ -21,7 +21,7 @@ const { autoUpdater } = require('electron-updater');
 // no transceiver, antes da negociação, em renderer/js/encoder.js.
 require('./video-runtime').configureVideoRuntime(app);
 
-const BG = '#111315';
+const BG = '#141218';
 const isWayland = process.platform === 'linux'
   && (process.env.XDG_SESSION_TYPE === 'wayland' || !!process.env.WAYLAND_DISPLAY);
 let win;
@@ -146,7 +146,7 @@ function createWindow() {
     // Barra de título própria; os botões de minimizar/fechar do Windows ficam por cima.
     ...(process.platform === 'win32' ? {
       titleBarStyle: 'hidden',
-      titleBarOverlay: { color: BG, symbolColor: '#a4dced', height: 40 },
+      titleBarOverlay: { color: BG, symbolColor: '#e6e0e9', height: 40 },
     } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -342,6 +342,15 @@ ipcMain.handle('get-token', async (_event, params) => {
 });
 
 ipcMain.handle('check-server', async (_event, serverUrl) => tokens.checkServer(serverUrl));
+ipcMain.handle('settings:export-native', async (_event, settings) => {
+  if (process.platform !== 'win32') return false;
+  try {
+    await require('./native-settings-export').writeNativeSettings(app.getPath('userData'), settings);
+    return true;
+  } catch (_) {
+    return false;
+  }
+});
 
 ipcMain.handle('updater:get-status', () => updaterState);
 ipcMain.handle('updater:check', () => checkForUpdates());

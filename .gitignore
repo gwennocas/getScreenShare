@@ -6,3 +6,9 @@ dist/
 *.log
 .DS_Store
 Thumbs.db
+
+# Compilação do cliente Rust
+experiments/egui-probe/target/
+experiments/tauri-capture/target/
+experiments/tauri-capture/frontend/
+experiments/tauri-capture/gen/schemas/

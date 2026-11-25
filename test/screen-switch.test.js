@@ -22,7 +22,7 @@ function harness({ captureError, replaceError, capturePromise, replacePromise, c
       hidden: false, disabled: false, open: false, value: '', textContent: '',
       showModal() { this.open = true; }, close() { this.open = false; },
       closest() { return element(`${id}-label`); },
-      replaceChildren() {}, addEventListener() {},
+      replaceChildren() {}, setAttribute() {}, addEventListener() {},
     });
     return elements.get(id);
   };
@@ -57,6 +57,7 @@ function harness({ captureError, replaceError, capturePromise, replacePromise, c
     document: { getElementById: element, querySelector: element },
     navigator: { mediaDevices: { async getDisplayMedia(options) {
       calls.capture++;
+      calls.captureOptions = options;
       assert.equal(options.audio, false, 'áudio existente não deve ser recapturado');
       assert.equal(options.video.frameRate.max, 60);
       if (captureError) throw captureError;
@@ -281,4 +282,14 @@ test('não inicia outra seleção antes de a parada anterior terminar', async ()
   pending.resolve();
   await operation;
   assert.equal(h.element('btn-share').disabled, false);
+});
+
+
+test('resolução da fonte não limita as dimensões ao trocar de tela', async () => {
+  const h = harness();
+  h.run("shareOptions.quality = 'source60'");
+  await h.run('switchShare()');
+  assert.equal(h.calls.captureOptions.video.width, undefined);
+  assert.equal(h.calls.captureOptions.video.height, undefined);
+  assert.equal(h.calls.captureOptions.video.frameRate.max, 60);
 });

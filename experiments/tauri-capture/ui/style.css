@@ -1,0 +1,6 @@
+:root { color-scheme: dark; font: 16px "Segoe UI", sans-serif; background: #141218; color: #e6e0e9; }
+main { max-width: 820px; margin: 40px auto; padding: 0 24px; }
+button { border: 0; border-radius: 999px; padding: 12px 20px; background: #d0bcff; color: #381e72; font: inherit; cursor: pointer; }
+button:disabled { opacity: .45; cursor: default; }
+button:focus-visible { outline: 2px solid white; outline-offset: 3px; }
+video { width: 100%; max-height: 55vh; background: #000; border-radius: 20px; }

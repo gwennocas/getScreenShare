@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('api', {
     audioChunkListener = null;
   },
   getToken: (params) => ipcRenderer.invoke('get-token', params),
+  exportNativeSettings: (settings) => ipcRenderer.invoke('settings:export-native', settings),
   checkServer: (serverUrl) => ipcRenderer.invoke('check-server', serverUrl),
   openGpuDiagnostics: () => ipcRenderer.invoke('open-gpu-diagnostics'),
   getGpuStatus: () => ipcRenderer.invoke('get-gpu-status'),

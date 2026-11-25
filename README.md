@@ -1,13 +1,17 @@
 # getScreenShare
 
-App de desktop para compartilhar a tela em tempo real, feito com Electron e WebRTC (LiveKit).
+App de desktop para compartilhar a tela em tempo real, com Tauri, WebView e WebRTC (LiveKit).
 Cada pessoa entra numa sala pelo nome, escolhe uma tela ou janela e os participantes assistem em tempo real. A latência depende da rede, do codec e do dispositivo.
+
+## Cliente desktop Tauri
+
+O cliente Tauri para Windows e Linux reaproveita a interface LiveKit existente e mantém a lógica nativa de captura WASAPI. A migração e a validação das duas plataformas estão em andamento em [`experiments/tauri-capture`](experiments/tauri-capture/README.md).
 
 Durante o compartilhamento, use **Trocar tela** para escolher outra tela ou janela sem parar a transmissão. Confirme a nova fonte no seletor; o áudio, a câmera e a qualidade atual são mantidos. No Wayland, a escolha acontece no portal do sistema. Se cancelar a escolha ou a nova captura falhar, a fonte atual continua sendo transmitida.
 
 O botão **X** esconde a janela na bandeja do sistema e mantém a sala, a tela, a câmera e o áudio funcionando. Clique no ícone da bandeja ou em **Abrir getScreenShare** no menu dele para voltar. Para encerrar o aplicativo e a transmissão, escolha **Sair** nesse menu. Se o ícone da bandeja não puder ser criado, o **X** fecha normalmente.
 
-O app mantém uma única instância por perfil. Abrir o executável ou o atalho novamente restaura a janela existente, mesmo se ela estiver na bandeja, sem criar outra sala ou outro ícone. Isso também vale para `npm start`. O Electron continua usando processos auxiliares para renderização, GPU e mídia.
+O app mantém uma única instância por perfil. Abrir o executável ou o atalho novamente restaura a janela existente, mesmo se ela estiver na bandeja, sem criar outra sala ou outro ícone.
 
 Na sala, **Ligar câmera** permite escolher uma câmera disponível e publicá-la ao lado das telas. Se uma câmera não aparecer na lista, use **Detectar outras câmeras** para autorizar o acesso e atualizar os dispositivos. A câmera pode continuar ligada enquanto você compartilha a tela. **Desligar câmera** interrompe a captura; o microfone não é ativado.
 
@@ -15,28 +19,27 @@ Na sala, **Ligar câmera** permite escolher uma câmera disponível e publicá-l
 
 Baixe a versão desejada em [Releases](https://github.com/gwennocas/getScreenShare/releases).
 
-- **Windows x64:** execute `getScreenShare-Setup-VERSÃO.exe`.
-- **Linux x64:** baixe `getScreenShare-VERSÃO-linux-x86_64.AppImage`, permita a execução nas propriedades do arquivo e abra-o. Pelo terminal, use `chmod +x getScreenShare-*.AppImage` e execute o arquivo baixado. Algumas distribuições precisam do pacote de compatibilidade do FUSE 2 para abrir AppImages.
+- **Windows x64:** execute `getScreenShare-Tauri-Setup-vVERSÃO.exe`.
+- **Linux x64:** baixe `getScreenShare-vVERSÃO-linux-x86_64.AppImage`, permita a execução nas propriedades do arquivo e abra-o. Pelo terminal, use `chmod +x getScreenShare-*.AppImage` e execute o arquivo baixado. Algumas distribuições precisam do pacote de compatibilidade do FUSE 2 para abrir AppImages.
 
 Na primeira execução, configure a URL do servidor de tokens e o código de acesso em **Configurações → Geral → Conexão**.
 
 | Recurso | Windows x64 | Linux x64 |
 | --- | --- | --- |
-| Tela e janela | Seletor do aplicativo | Portal do sistema no Wayland; seletor do aplicativo no X11 |
+| Tela e janela | Seletor do sistema | Seletor do sistema e portal no Wayland |
 | Câmera | Disponível | Disponível |
-| Codificação por GPU | Conforme driver e codec | VA-API, conforme driver e codec |
+| Codificação por GPU | Conforme WebView2, driver e codec | VA-API, conforme WebKitGTK, driver e codec |
 | Áudio do computador com exclusão do Discord | WASAPI, Windows compatível | Indisponível |
 | Atualização pelo aplicativo | Disponível | Instalação manual da nova versão |
 
-A captura Wayland e a codificação por GPU foram confirmadas em Arch Linux com Hyprland e Radeon RX 6600. Outros desktops precisam do backend de portal correspondente.
+O seletor de captura Wayland depende do backend de portal correspondente. A migração Tauri ainda precisa de validação em uma sessão Wayland e durante transmissão com codificação por GPU.
 
 ## Rodar durante o desenvolvimento (Windows e Linux)
 
-1. Instale o Node.js (versão LTS) em https://nodejs.org
-2. Para hospedar seu próprio servidor, crie um projeto no LiveKit Cloud (https://cloud.livekit.io) e obtenha a URL (`wss://...`), a API Key e o API Secret. Quem usa um servidor existente não precisa dessas credenciais.
-3. Abra um terminal nesta pasta e rode `npm install`.
-4. Configure um servidor de tokens conforme as instruções abaixo, ou obtenha a URL e o código de acesso de quem já hospeda um.
-5. Rode `npm start` e informe a URL e o código em **Configurações → Geral → Conexão**.
+1. Instale Node.js (versão LTS), Rust estável, o Tauri CLI e os pré-requisitos de compilação da sua plataforma.
+2. Rode `npm ci` na raiz do repositório.
+3. Configure um servidor de tokens conforme as instruções abaixo, ou obtenha a URL e o código de acesso de quem já hospeda um.
+4. Rode `npm run tauri:dev` e informe a URL e o código em **Configurações → Geral → Conexão**.
 
 Para testar a transmissão, abra o app em dois computadores, entre na mesma sala nos dois e compartilhe a tela em um deles. Deixe "Compartilhar o áudio do computador" desmarcado se os computadores reproduzirem o mesmo áudio no ambiente, para evitar retorno.
 
@@ -58,7 +61,7 @@ Defina `LIVEKIT_URL`, `LIVEKIT_API_KEY` e `LIVEKIT_API_SECRET` com as credenciai
 
 ## Gerar o instalador
 
-No Linux, rode `npm run dist` para gerar o AppImage ou `npm run dist:deb` para gerar um pacote `.deb` (requer `libcrypt.so.1` no sistema de compilação). No Windows, rode `npm run dist:win` para gerar o instalador NSIS. Os arquivos aparecem na pasta `dist/`. Depois de instalar, configure a URL do servidor de tokens e o código de acesso. Nenhum arquivo `.env` é necessário no computador de quem usa o app.
+Rode `npm run tauri:build` na plataforma desejada para gerar o instalador NSIS no Windows ou AppImage no Linux. Os arquivos aparecem em `experiments/tauri-capture/target/release/bundle/`. Depois de instalar, configure a URL do servidor de tokens e o código de acesso. Nenhum arquivo `.env` é necessário no computador de quem usa o app.
 
 ### Atualizar o app
 
@@ -68,15 +71,15 @@ No Linux, rode `npm run dist` para gerar o AppImage ou `npm run dist:deb` para g
 
 ### Publicar uma versão
 
-1. Atualize `version` em `package.json` e `package-lock.json`, execute `npm test` e envie as alterações ao repositório.
+1. Atualize a versão em `package.json`, `package-lock.json`, `experiments/tauri-capture/Cargo.toml` e `experiments/tauri-capture/tauri.conf.json`; execute `npm test` e compile os pacotes Tauri em Windows e Linux.
 2. No GitHub, crie uma release com a tag `vVERSÃO`, apontando para o commit da versão.
 3. Ao publicar a release, o workflow `.github/workflows/release.yml` gera o instalador Windows e o AppImage Linux e anexa os pacotes e metadados de atualização. Acompanhe a execução na aba **Actions**; os downloads ficam prontos quando o workflow terminar.
 
-O workflow usa o token automático do GitHub Actions. Para publicar localmente, configure `GH_TOKEN` com permissão de escrita no repositório e rode `npm run release` no sistema para o qual deseja gerar o pacote.
+O workflow usa o token automático do GitHub Actions para anexar os pacotes à release publicada.
 
 ### Compartilhamento no Wayland
 
-Em uma sessão Wayland, clique em **Compartilhar tela** e depois em **Começar a compartilhar**. Escolha a tela ou janela no portal do sistema (PipeWire/xdg-desktop-portal). É necessário ter um backend do portal instalado para seu ambiente de desktop. O seletor interno continua disponível no Windows e no Linux com X11. O áudio do computador é desativado no Linux; a captura WASAPI com exclusão do Discord continua disponível no Windows.
+Em uma sessão Wayland, clique em **Compartilhar tela** e depois em **Começar a compartilhar**. Escolha a tela ou janela no seletor do sistema (PipeWire/xdg-desktop-portal). É necessário ter um backend do portal instalado para seu ambiente de desktop. O áudio do computador é desativado no Linux; a captura WASAPI com exclusão do Discord continua disponível no Windows.
 
 #### Preparar o portal
 
@@ -115,22 +118,18 @@ Em cada tela recebida, o botão de informação alterna entre resumo, detalhes c
 - Encoder: o nome da implementação em uso (por exemplo, `OpenH264` é por software).
 - Limite: o que está segurando a qualidade (processador ou internet).
 
-O app prioriza H.264 High quando o Chromium anuncia suporte a esse perfil, preservando os demais para compatibilidade com o servidor. Em um teste no Windows com RX 6600, Baseline, Main e High usaram `MediaFoundationVideoEncodeAccelerator (AMDh264Encoder)`, enquanto Constrained Baseline usou `OpenH264`. O painel "Seu envio" mostra o perfil negociado e o encoder realmente usado. O LiveKit está fixado na versão 2.23.0 porque a configuração de preferência usa seu evento de criação do sender e o acesso ao transceiver do transporte.
+O app prioriza H.264 High quando o WebView anuncia suporte a esse perfil, preservando os demais para compatibilidade com o servidor. O painel "Seu envio" mostra o perfil negociado e o encoder informado pelo navegador. O LiveKit está fixado na versão 2.23.0 porque a configuração de preferência usa seu evento de criação do sender e o acesso ao transceiver do transporte.
 
-No Linux, `VaapiVideoEncodeAccelerator` identifica a codificação por VA-API; `OpenH264` identifica software. O app habilita o encoder VA-API do Chromium e usa ANGLE/OpenGL por padrão. O driver precisa oferecer codificação para o codec escolhido; confira o encoder realmente usado no painel "Seu envio". É possível passar `--disable-features=AcceleratedVideoEncoder` para desativar essa opção ao diagnosticar problemas.
+No Linux, o driver e o WebViewGTK precisam oferecer codificação para o codec escolhido; confira o encoder mostrado no painel "Seu envio" durante a transmissão.
 
-Se aparecer "processador", teste desligar o simulcast nas configurações e compartilhar de novo. Em Configurações, o estado de `Video Encode` mostra a disponibilidade geral da GPU; "Abrir diagnóstico da GPU" exibe os detalhes de `chrome://gpu`. A disponibilidade geral não garante que o perfil negociado ou a configuração de transmissão possam usar hardware.
+Se aparecer "processador", teste desligar o simulcast nas configurações e compartilhar de novo. A disponibilidade geral da GPU não garante que o perfil negociado ou a configuração de transmissão possam usar hardware.
 
 ## Estrutura
 
-- `main.js`: janela, lista de telas, captura e tokens
-- `tray-lifecycle.js`: bandeja do sistema, reabertura e encerramento do aplicativo
-- `single-instance.js`: impede cópias adicionais e reabre a instância existente
-- `video-runtime.js`: inicialização da codificação VA-API no Linux
-- `test/`: testes da configuração de vídeo
-- `.github/workflows/release.yml`: pacotes Windows e Linux para Releases
-- `token.js`: gera ou busca o token da sala
-- `preload.js`: ponte segura entre a interface e o `main.js`
+- `experiments/tauri-capture/src/`: shell Tauri, bandeja, áudio WASAPI e comandos nativos
 - `renderer/`: interface (`index.html`, `style.css`, `js/`, `fonts/`)
+- `scripts/prepare-tauri-frontend.js`: prepara o renderer e copia o bundle LiveKit
+- `test/`: testes do renderer e da lógica de captura
+- `.github/workflows/release.yml`: builds Windows e Linux para Releases
 - `server/`: servidor de tokens
 - `build/`: ícone do app

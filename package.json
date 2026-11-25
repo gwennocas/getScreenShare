@@ -1,19 +1,21 @@
 {
   "name": "getscreenshare",
-  "version": "0.3.0",
-  "description": "Compartilhamento de tela em tempo real (Electron + LiveKit)",
+  "version": "0.4.5",
+  "description": "Compartilhamento de tela em tempo real (Tauri + LiveKit)",
   "main": "main.js",
   "author": "getScreenShare",
   "license": "MIT",
   "scripts": {
-    "start": "electron .",
+    "start": "cd experiments/tauri-capture && cargo tauri dev",
     "server": "node server/index.js",
-    "dist": "electron-builder",
-    "release": "electron-builder --publish always",
-    "dist:win": "electron-builder --win",
-    "dist:deb": "electron-builder --linux deb",
+    "dist": "cd experiments/tauri-capture && cargo tauri build",
+    "dist:win": "cd experiments/tauri-capture && cargo tauri build --bundles nsis",
+    "dist:deb": "cd experiments/tauri-capture && cargo tauri build --bundles deb",
     "test": "node --test test/*.test.js",
-    "dist:linux": "electron-builder --linux AppImage"
+    "dist:linux": "cd experiments/tauri-capture && cargo tauri build --bundles appimage",
+    "tauri:prepare": "node scripts/prepare-tauri-frontend.js",
+    "tauri:dev": "cd experiments/tauri-capture && cargo tauri dev",
+    "tauri:build": "cd experiments/tauri-capture && cargo tauri build"
   },
   "dependencies": {
     "electron-updater": "6.8.11",
@@ -36,6 +38,7 @@
       "room-clipboard.js",
       "tray-lifecycle.js",
       "single-instance.js",
+      "native-settings-export.js",
       "preload.js",
       "token.js",
       "renderer/**/*",

@@ -3,6 +3,7 @@
 const SETTINGS_KEY = 'getscreenshare.settings.v1';
 
 const QUALITY = {
+  'source60': { width: 0, height: 0, fps: 60, bitrate: 12_000_000 },
   '1080p60': { width: 1920, height: 1080, fps: 60, bitrate: 6_000_000 },
   '1080p30': { width: 1920, height: 1080, fps: 30, bitrate: 4_000_000 },
   '720p60':  { width: 1280, height: 720,  fps: 60, bitrate: 3_500_000 },
@@ -25,10 +26,11 @@ const DEFAULT_SETTINGS = {
 
 let currentSettings = { ...DEFAULT_SETTINGS };
 
-function loadSettings() {
+function loadSettings(imported = {}) {
+  currentSettings = { ...DEFAULT_SETTINGS, ...imported };
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) currentSettings = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    if (raw) currentSettings = { ...currentSettings, ...JSON.parse(raw) };
   } catch (_) { /* sem armazenamento: usa os padrões */ }
   // Descarta o modo de autenticação antigo, preservando URL e preferências.
   delete currentSettings.tokenMode;
@@ -43,7 +45,10 @@ function getSettings() {
 function saveSettings(patch) {
   currentSettings = { ...currentSettings, ...patch };
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(currentSettings));
+    const stored = { ...currentSettings };
+    if (window.api?.loadLegacySettings) delete stored.accessCode;
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(stored));
   } catch (_) { /* ignora */ }
+  if (window.api?.exportNativeSettings) void window.api.exportNativeSettings(currentSettings).catch(() => {});
   return currentSettings;
 }

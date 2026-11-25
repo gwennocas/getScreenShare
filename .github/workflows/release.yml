@@ -1,4 +1,4 @@
-name: Release Windows and Linux
+name: Build Tauri releases
 
 on:
   release:
@@ -8,16 +8,8 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            script: dist:linux
-          - os: windows-latest
-            script: dist:win
-    runs-on: ${{ matrix.os }}
+  validate:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -26,17 +18,99 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+      - run: npm ci
+      - run: npm test
       - name: Check release version
         shell: bash
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: node -e 'if (process.env.RELEASE_TAG !== "v" + require("./package.json").version) throw new Error("Release tag must match package.json version")'
+        run: |
+          node -e 'if (process.env.RELEASE_TAG !== "v" + require("./package.json").version) throw new Error("Release tag must match package.json version")'
+          node -e 'const version = require("node:fs").readFileSync("experiments/tauri-capture/Cargo.toml", "utf8").match(/^version = "([^"]+)"/m)?.[1]; if (process.env.RELEASE_TAG !== "v" + version) throw new Error("Release tag must match Tauri Cargo.toml version")'
+
+  windows:
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
       - run: npm ci
-      - run: npm test
-      - name: Check Windows audio module
-        if: runner.os == 'Windows'
-        run: node -e "require('node:fs').accessSync('node_modules/wasapi-loopback/prebuilds/windows-x86_64/wasapi-loopback-win32-x64.node')"
-      - name: Build and upload release assets
-        run: npm run ${{ matrix.script }} -- --publish always
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2" --locked
+      - name: Build NSIS installer
+        working-directory: experiments/tauri-capture
+        run: cargo tauri build --bundles nsis
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}\gss-tauri
+      - name: Upload Windows installer and checksum
+        shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          CARGO_TARGET_DIR: ${{ runner.temp }}\gss-tauri
+        run: |
+          $built = Get-ChildItem (Join-Path $env:CARGO_TARGET_DIR 'release/bundle/nsis') -Filter '*.exe' | Select-Object -First 1
+          if (-not $built) { throw 'Tauri did not produce an NSIS installer.' }
+          $asset = Join-Path $env:RUNNER_TEMP "getScreenShare-Tauri-Setup-$env:RELEASE_TAG.exe"
+          Copy-Item -LiteralPath $built.FullName -Destination $asset
+          $hash = (Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash.ToLowerInvariant()
+          [IO.File]::WriteAllText("$asset.sha256", $hash, [Text.UTF8Encoding]::new($false))
+          $sha512 = [Convert]::ToBase64String([Security.Cryptography.SHA512]::HashData([IO.File]::ReadAllBytes($asset)))
+          $size = (Get-Item -LiteralPath $asset).Length
+          $version = $env:RELEASE_TAG -replace '^v', ''
+          $name = [IO.Path]::GetFileName($asset)
+          $releaseDate = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ss.fffZ')
+          $metadata = @(
+            "version: $version"
+            'files:'
+            "  - url: $name"
+            "    sha512: $sha512"
+            "    size: $size"
+            "path: $name"
+            "sha512: $sha512"
+            "releaseDate: $releaseDate"
+          ) -join "`n"
+          [IO.File]::WriteAllText((Join-Path $env:RUNNER_TEMP 'latest.yml'), "$metadata`n", [Text.UTF8Encoding]::new($false))
+          gh release upload $env:RELEASE_TAG $asset "$asset.sha256" (Join-Path $env:RUNNER_TEMP 'latest.yml') --clobber
+
+  linux:
+    needs: validate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Tauri Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev
+      - run: npm ci
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2" --locked
+      - name: Build AppImage
+        working-directory: experiments/tauri-capture
+        run: cargo tauri build --bundles appimage
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/gss-tauri
+      - name: Upload Linux AppImage
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          CARGO_TARGET_DIR: ${{ runner.temp }}/gss-tauri
+        run: |
+          built=$(find "$CARGO_TARGET_DIR/release/bundle/appimage" -maxdepth 1 -type f -name '*.AppImage' -print -quit)
+          test -n "$built"
+          asset="$RUNNER_TEMP/getScreenShare-$RELEASE_TAG-linux-x86_64.AppImage"
+          cp "$built" "$asset"
+          gh release upload "$RELEASE_TAG" "$asset" --clobber

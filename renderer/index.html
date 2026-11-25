@@ -26,6 +26,11 @@
       <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
       <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></symbol>
       <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+      <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+      <symbol id="i-minimize" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+      <symbol id="i-maximize" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/></symbol>
+      <symbol id="i-restore" viewBox="0 0 24 24"><path d="M8 8V5h11v11h-3M5 8h11v11H5z"/></symbol>
       <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></symbol>
       <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
     </defs>
@@ -56,6 +61,17 @@
     <button id="btn-settings" class="icon-btn" type="button" aria-label="Configurações" title="Configurações">
       <svg class="i"><use href="#i-sliders"/></svg>
     </button>
+    <div class="window-controls" aria-label="Controles da janela">
+      <button id="btn-window-minimize" class="window-control" type="button" aria-label="Minimizar" title="Minimizar">
+        <svg class="i"><use href="#i-minimize"/></svg>
+      </button>
+      <button id="btn-window-maximize" class="window-control" type="button" aria-label="Maximizar" title="Maximizar">
+        <svg class="i"><use href="#i-maximize"/></svg>
+      </button>
+      <button id="btn-window-close" class="window-control close" type="button" aria-label="Fechar" title="Fechar">
+        <svg class="i"><use href="#i-close"/></svg>
+      </button>
+    </div>
   </header>
 
   <!-- Entrada -->
@@ -120,6 +136,7 @@
         <svg class="i"><use href="#i-refresh"/></svg>
         Trocar tela
       </button>
+      <button id="btn-preview" class="btn ghost" type="button" aria-pressed="false" hidden>Mostrar minha tela</button>
       <button id="btn-stop" class="btn danger" type="button" hidden>
         <svg class="i"><use href="#i-stop"/></svg>
         Parar transmissão
@@ -166,6 +183,7 @@
       <label class="field">
         <span>Qualidade</span>
         <select id="pk-quality">
+          <option value="source60">Resolução da fonte, até 60 fps (cerca de 12 Mbps)</option>
           <option value="1080p60">1080p 60 fps (cerca de 6 Mbps)</option>
           <option value="1080p30">1080p 30 fps (cerca de 4 Mbps)</option>
           <option value="720p60">720p 60 fps (cerca de 3,5 Mbps)</option>
@@ -304,6 +322,7 @@
   </dialog>
 
   <script src="../node_modules/livekit-client/dist/livekit-client.umd.js"></script>
+  <script src="js/tauri-api.js"></script>
   <script src="js/encoder.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/stats.js"></script>
