@@ -1,11 +1,11 @@
 # getScreenShare
 
-App de desktop para compartilhar a tela em tempo real, com Tauri, WebView e WebRTC (LiveKit).
+App de desktop para compartilhar a tela em tempo real, com Tauri no Windows, Electron no Linux e WebRTC (LiveKit).
 Cada pessoa entra numa sala pelo nome, escolhe uma tela ou janela e os participantes assistem em tempo real. A latência depende da rede, do codec e do dispositivo.
 
-## Cliente desktop Tauri
+## Cliente desktop
 
-O cliente Tauri para Windows e Linux reaproveita a interface LiveKit existente e mantém a lógica nativa de captura WASAPI. A migração e a validação das duas plataformas estão em andamento em [`experiments/tauri-capture`](experiments/tauri-capture/README.md).
+O cliente Windows usa Tauri. No Linux, o app usa Electron e Chromium para manter o suporte a WebRTC do LiveKit. O WebKitGTK usado pelo Tauri não fornece `RTCPeerConnection` neste ambiente, então o LiveKit recusa a conexão antes de entrar na sala. O cliente Electron já trata captura pelo portal PipeWire no Wayland e pelo seletor de tela no X11. A shell Tauri e a migração do Windows estão em [`experiments/tauri-capture`](experiments/tauri-capture/README.md).
 
 Durante o compartilhamento, use **Trocar tela** para escolher outra tela ou janela sem parar a transmissão. Confirme a nova fonte no seletor; o áudio, a câmera e a qualidade atual são mantidos. No Wayland, a escolha acontece no portal do sistema. Se cancelar a escolha ou a nova captura falhar, a fonte atual continua sendo transmitida.
 
@@ -28,18 +28,18 @@ Na primeira execução, configure a URL do servidor de tokens e o código de ace
 | --- | --- | --- |
 | Tela e janela | Seletor do sistema | Seletor do sistema e portal no Wayland |
 | Câmera | Disponível | Disponível |
-| Codificação por GPU | Conforme WebView2, driver e codec | VA-API, conforme WebKitGTK, driver e codec |
+| Codificação por GPU | Conforme WebView2, driver e codec | VA-API, conforme Chromium, driver e codec |
 | Áudio do computador com exclusão do Discord | WASAPI, Windows compatível | Indisponível |
 | Atualização pelo aplicativo | Disponível | Instalação manual da nova versão |
 
-O seletor de captura Wayland depende do backend de portal correspondente. A migração Tauri ainda precisa de validação em uma sessão Wayland e durante transmissão com codificação por GPU.
+O seletor de captura Wayland depende do backend de portal correspondente. A captura e a transmissão no Electron ainda devem ser validadas em cada ambiente Wayland e com codificação por GPU.
 
-## Rodar durante o desenvolvimento (Windows e Linux)
+## Rodar durante o desenvolvimento
 
-1. Instale Node.js (versão LTS), Rust estável, o Tauri CLI e os pré-requisitos de compilação da sua plataforma.
-2. Rode `npm ci` na raiz do repositório.
-3. Configure um servidor de tokens conforme as instruções abaixo, ou obtenha a URL e o código de acesso de quem já hospeda um.
-4. Rode `npm run tauri:dev` e informe a URL e o código em **Configurações → Geral → Conexão**.
+1. Instale Node.js (versão LTS) e rode `npm ci` na raiz do repositório.
+2. No Windows, instale Rust estável, o Tauri CLI e os pré-requisitos de compilação; rode `npm run tauri:dev`.
+3. No Linux, rode `npm run electron:dev`.
+4. Configure um servidor de tokens conforme as instruções abaixo, ou obtenha a URL e o código de acesso de quem já hospeda um. Informe ambos em **Configurações → Geral → Conexão**.
 
 Para testar a transmissão, abra o app em dois computadores, entre na mesma sala nos dois e compartilhe a tela em um deles. Deixe "Compartilhar o áudio do computador" desmarcado se os computadores reproduzirem o mesmo áudio no ambiente, para evitar retorno.
 
@@ -61,7 +61,7 @@ Defina `LIVEKIT_URL`, `LIVEKIT_API_KEY` e `LIVEKIT_API_SECRET` com as credenciai
 
 ## Gerar o instalador
 
-Rode `npm run tauri:build` na plataforma desejada para gerar o instalador NSIS no Windows ou AppImage no Linux. Os arquivos aparecem em `experiments/tauri-capture/target/release/bundle/`. Depois de instalar, configure a URL do servidor de tokens e o código de acesso. Nenhum arquivo `.env` é necessário no computador de quem usa o app.
+Rode `npm run tauri:build` no Windows para gerar o instalador NSIS. No Linux, rode `npm run dist:linux` para gerar o AppImage Electron em `dist/`. Depois de instalar, configure a URL do servidor de tokens e o código de acesso. Nenhum arquivo `.env` é necessário no computador de quem usa o app.
 
 ### Atualizar o app
 
@@ -71,9 +71,9 @@ Rode `npm run tauri:build` na plataforma desejada para gerar o instalador NSIS n
 
 ### Publicar uma versão
 
-1. Atualize a versão em `package.json`, `package-lock.json`, `experiments/tauri-capture/Cargo.toml` e `experiments/tauri-capture/tauri.conf.json`; execute `npm test` e compile os pacotes Tauri em Windows e Linux.
+1. Atualize a versão em `package.json`, `package-lock.json`, `experiments/tauri-capture/Cargo.toml` e `experiments/tauri-capture/tauri.conf.json`; execute `npm test`, compile o Tauri no Windows e gere o AppImage Electron no Linux.
 2. No GitHub, crie uma release com a tag `vVERSÃO`, apontando para o commit da versão.
-3. Ao publicar a release, o workflow `.github/workflows/release.yml` gera o instalador Windows e o AppImage Linux e anexa os pacotes e metadados de atualização. Acompanhe a execução na aba **Actions**; os downloads ficam prontos quando o workflow terminar.
+3. Ao publicar a release, o workflow `.github/workflows/release.yml` gera o instalador Tauri do Windows e o AppImage Electron do Linux. Acompanhe a execução na aba **Actions**; os downloads ficam prontos quando o workflow terminar.
 
 O workflow usa o token automático do GitHub Actions para anexar os pacotes à release publicada.
 
@@ -130,6 +130,6 @@ Se aparecer "processador", teste desligar o simulcast nas configurações e comp
 - `renderer/`: interface (`index.html`, `style.css`, `js/`, `fonts/`)
 - `scripts/prepare-tauri-frontend.js`: prepara o renderer e copia o bundle LiveKit
 - `test/`: testes do renderer e da lógica de captura
-- `.github/workflows/release.yml`: builds Windows e Linux para Releases
+- `.github/workflows/release.yml`: builds Tauri para Windows e Electron para Linux
 - `server/`: servidor de tokens
 - `build/`: ícone do app
