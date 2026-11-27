@@ -15,6 +15,8 @@ O app mantém uma única instância por perfil. Abrir o executável ou o atalho 
 
 Na sala, **Ligar câmera** permite escolher uma câmera disponível e publicá-la ao lado das telas. Se uma câmera não aparecer na lista, use **Detectar outras câmeras** para autorizar o acesso e atualizar os dispositivos. A câmera pode continuar ligada enquanto você compartilha a tela. **Desligar câmera** interrompe a captura; o microfone não é ativado.
 
+Na sala, use **+ / −** nos controles de cada vídeo para ajustar o zoom e a seta circular para voltar ao tamanho original. O chat envia mensagens aos participantes conectados à sala. Na entrada, **Salas recentes** mostra até oito salas usadas neste dispositivo para reentrar rapidamente.
+
 ## Instalar
 
 Baixe a versão desejada em [Releases](https://github.com/gwennocas/getScreenShare/releases).

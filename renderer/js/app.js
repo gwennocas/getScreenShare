@@ -12,6 +12,8 @@ const els = {
   roomName: $('room-name'), copyRoom:$('btn-copy-room'),
   conn: $('conn'), connText:$('conn-text'),
   form: $('join-form'), name: $('name'), room:$('room'), lobbyError: $('lobby-error'), join:$('btn-join'),
+  recentRooms: $('recent-rooms'), recentRoomList: $('recent-room-list'),
+  chatForm: $('chat-form'), chatInput: $('chat-input'), chatSend: $('chat-send'), chatMessages: $('chat-messages'),
   peopleList: $('people-list'), peopleCount:$('people-count'),
   own: $('own'), ownStats:$('own-stats'), ownSource:$('own-source'),
   grid: $('grid'), empty:$('empty'), emptyTitle: $('empty-title'), emptyText:$('empty-text'),
@@ -66,6 +68,8 @@ let excludedAudioTrack = null;
 
 const tiles = new Map();       // identity:source -> { el, video, track, stop }
 const audioByPeer = new Map(); // identity -> { els: [], volume, muted }
+const RECENT_ROOMS_KEY = 'getscreenshare.recent-rooms.v1';
+const CHAT_TOPIC = 'getscreenshare-chat-v1';
 
 // ---------- Utilidades ----------
 
@@ -218,6 +222,8 @@ async function joinRoom(event) {
 
     room = r;
     saveSettings({ name: els.name.value.trim(), room: roomName });
+    rememberRoom(roomName);
+    els.chatMessages.replaceChildren();
     els.roomName.textContent = roomName;
     setConnQuality('unknown');
     setView('room');
@@ -279,6 +285,7 @@ function bindRoomEvents(r) {
   let reconnectToast = null;
   r.on(RoomEvent.TrackSubscribed, onTrackSubscribed)
     .on(RoomEvent.TrackUnsubscribed, onTrackUnsubscribed)
+    .on(RoomEvent.DataReceived, onRoomData)
     .on(RoomEvent.ParticipantConnected, (p) => { toast(`${displayName(p)} entrou`); renderPeople(); })
     .on(RoomEvent.ParticipantDisconnected, (p) => {
       toast(`${displayName(p)} saiu`);
@@ -312,6 +319,99 @@ function bindRoomEvents(r) {
       setView('lobby');
       if (!wasLeaving) toast('Você foi desconectado da sala', { kind: 'error' });
     });
+}
+
+function onRoomData(payload, participant, _kind, topic) {
+  if (topic !== CHAT_TOPIC) return;
+  try {
+    const message = JSON.parse(new TextDecoder().decode(payload));
+    if (message.type !== 'chat' || typeof message.text !== 'string') return;
+    const text = message.text.trim().slice(0, 400);
+    if (text) appendChatMessage(participant ? displayName(participant) : 'Convidado', text, Date.now());
+  } catch (_) { /* ignora dados que não são mensagens válidas */ }
+}
+
+async function sendChatMessage(event) {
+  event.preventDefault();
+  const text = els.chatInput.value.trim().slice(0, 400);
+  if (!room || !text || els.chatSend.disabled) return;
+  const activeRoom = room;
+  els.chatSend.disabled = true;
+  try {
+    await activeRoom.localParticipant.publishData(
+      new TextEncoder().encode(JSON.stringify({ type: 'chat', text })),
+      { reliable: true, topic: CHAT_TOPIC },
+    );
+    if (room === activeRoom) {
+      appendChatMessage(displayName(activeRoom.localParticipant), text, Date.now());
+      els.chatInput.value = '';
+    }
+  } catch (err) {
+    toast(`Não foi possível enviar: ${friendlyError(err)}`, { kind: 'error' });
+  } finally {
+    els.chatSend.disabled = false;
+  }
+}
+
+function appendChatMessage(name, text, timestamp) {
+  const li = document.createElement('li');
+  const head = document.createElement('div');
+  head.className = 'chat-message-head';
+  const author = document.createElement('strong');
+  author.textContent = name;
+  const time = document.createElement('time');
+  time.dateTime = new Date(timestamp).toISOString();
+  time.textContent = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(timestamp);
+  const body = document.createElement('p');
+  body.textContent = text;
+  head.append(author, time);
+  li.append(head, body);
+  els.chatMessages.appendChild(li);
+  while (els.chatMessages.children.length > 200) els.chatMessages.firstElementChild.remove();
+  els.chatMessages.scrollTop = els.chatMessages.scrollHeight;
+}
+
+function readRecentRooms() {
+  try {
+    const value = JSON.parse(localStorage.getItem(RECENT_ROOMS_KEY) || '[]');
+    return Array.isArray(value) ? value.filter((item) => item && typeof item.name === 'string' && cleanRoom(item.name)) : [];
+  } catch (_) { return []; }
+}
+
+function rememberRoom(name) {
+  const rooms = [{ name, visitedAt: Date.now() }, ...readRecentRooms().filter((item) => item.name !== name)].slice(0, 8);
+  try { localStorage.setItem(RECENT_ROOMS_KEY, JSON.stringify(rooms)); } catch (_) { /* histórico opcional */ }
+  renderRecentRooms(rooms);
+}
+
+function renderRecentRooms(rooms = readRecentRooms()) {
+  if (!rooms.length) {
+    els.recentRooms.hidden = true;
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  rooms.forEach(({ name, visitedAt }) => {
+    const li = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'recent-room';
+    const roomName = document.createElement('span');
+    roomName.textContent = name;
+    const date = document.createElement('time');
+    if (Number.isFinite(visitedAt) && Math.abs(visitedAt) <= 8.64e15) {
+      date.dateTime = new Date(visitedAt).toISOString();
+      date.textContent = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(visitedAt);
+    } else date.textContent = 'recente';
+    button.append(roomName, date);
+    button.addEventListener('click', () => {
+      els.room.value = name;
+      els.form.requestSubmit();
+    });
+    li.appendChild(button);
+    frag.appendChild(li);
+  });
+  els.recentRoomList.replaceChildren(frag);
+  els.recentRooms.hidden = false;
 }
 
 // ---------- Pessoas ----------
@@ -498,15 +598,19 @@ function addTile(participant, track, source) {
     video.style.transform = `scale(${zoom})`;
     bZoomOut.disabled = zoom <= 1;
     bZoomIn.disabled = zoom >= 3;
+    bZoomReset.disabled = zoom === 1;
   };
   bZoomOut.disabled = true;
   bZoomOut.addEventListener('click', (e) => { e.stopPropagation(); changeZoom(-0.25); });
   bZoomIn.addEventListener('click', (e) => { e.stopPropagation(); changeZoom(0.25); });
+  const bZoomReset = iconButton('i-refresh', 'Redefinir zoom', 'btn-zoom-reset');
+  bZoomReset.disabled = true;
+  bZoomReset.addEventListener('click', (e) => { e.stopPropagation(); zoom = 1; video.style.transform = ''; bZoomOut.disabled = true; bZoomIn.disabled = false; bZoomReset.disabled = true; });
 
   const bFull = iconButton('i-expand', 'Tela cheia', 'btn-full');
   bFull.addEventListener('click', (e) => { e.stopPropagation(); toggleFullscreen(el); });
 
-  ctl.append(bStats, vol, bZoomOut, bZoomIn, bFocus, bFull);
+  ctl.append(bStats, vol, bZoomOut, bZoomReset, bZoomIn, bFocus, bFull);
   top.append(nm, ctl);
 
   const stats = document.createElement('div');
@@ -1252,8 +1356,12 @@ function init(importedSettings) {
   const s = loadSettings(importedSettings);
   els.name.value = s.name;
   els.room.value = s.room;
+  const recentRooms = readRecentRooms();
+  if (s.room && !recentRooms.some((item) => item.name === s.room)) recentRooms.push({ name: s.room });
+  renderRecentRooms(recentRooms.slice(0, 8));
 
   els.form.addEventListener('submit', joinRoom);
+  els.chatForm.addEventListener('submit', sendChatMessage);
   els.leave.addEventListener('click', leaveRoom);
   els.share.addEventListener('click', () => openPicker('start'));
   els.switch.addEventListener('click', () => openPicker('switch'));

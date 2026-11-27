@@ -94,6 +94,10 @@
         <p id="lobby-error" class="form-error" role="alert" hidden></p>
         <button id="btn-join" class="btn primary wide" type="submit">Entrar na sala</button>
       </form>
+      <section id="recent-rooms" class="recent-rooms" aria-label="Salas recentes" hidden>
+        <h2>Salas recentes</h2>
+        <ul id="recent-room-list"></ul>
+      </section>
       <p class="lobby-note">TELA + CÂMERA + ÁUDIO <span>/</span> EM TEMPO REAL</p>
     </div>
   </section>
@@ -106,6 +110,15 @@
         <span id="people-count" class="count">0</span>
       </div>
       <ul id="people-list"></ul>
+
+      <section id="chat" class="chat" aria-label="Mensagens da sala">
+        <div class="chat-head"><h2>Mensagens</h2><span class="hint">da sala</span></div>
+        <ol id="chat-messages" aria-live="polite" aria-label="Mensagens"></ol>
+        <form id="chat-form" autocomplete="off">
+          <input id="chat-input" type="text" maxlength="400" placeholder="Escreva uma mensagem…" aria-label="Mensagem" />
+          <button id="chat-send" class="btn primary small" type="submit">Enviar</button>
+        </form>
+      </section>
 
       <section id="own" class="own" hidden>
         <div class="own-head">

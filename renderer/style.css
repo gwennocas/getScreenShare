@@ -156,6 +156,13 @@ input:hover, select:hover { border-color: var(--faint); }
 #join-form { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: min(100%, 464px); padding: 22px; margin-top: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 28px; text-align: left; }
 #join-form .room-help, #join-form .form-error, #join-form .btn { grid-column: 1 / -1; }
 .room-help { margin: -4px 0 0; font-size: 10px; color: var(--muted); }
+.recent-rooms { width: min(100%, 464px); }
+.recent-rooms h2 { margin: 0 0 8px 4px; font-size: 12px; font-weight: 500; color: var(--muted); }
+#recent-room-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; list-style: none; margin: 0; padding: 0; }
+.recent-room { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-width: 0; padding: 8px 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; text-align: left; }
+.recent-room:hover { background: var(--raised); }
+.recent-room span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-room time { flex: none; color: var(--muted); font-size: 10px; }
 .lobby-note { margin: 0; font-size: 9px; letter-spacing: .08em; color: var(--muted); }
 .lobby-note span { margin: 0 8px; color: var(--live); }
 
@@ -196,6 +203,21 @@ input:hover, select:hover { border-color: var(--faint); }
 }
 .person-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .person-tag { font-size: 12px; color: var(--muted); }
+
+.chat { display: flex; flex: 1; flex-direction: column; min-height: 180px; max-height: 45%; padding-top: 10px; border-top: 1px solid var(--line); }
+.chat-head { display: flex; align-items: baseline; justify-content: space-between; padding: 0 8px 8px; }
+.chat-head h2 { font-size: 12px; font-weight: 500; }
+.chat-head .hint { font-size: 10px; }
+#chat-messages { display: flex; flex: 1; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; list-style: none; margin: 0; padding: 4px 6px 10px; }
+#chat-messages li { overflow-wrap: anywhere; }
+.chat-message-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.chat-message-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 500; }
+.chat-message-head time { flex: none; color: var(--muted); font-size: 9px; }
+#chat-messages p { margin: 1px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+#chat-form { display: flex; gap: 6px; padding: 0 2px; }
+#chat-input { min-width: 0; width: 100%; height: 34px; padding: 0 9px; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; }
+#chat-form .btn { flex: none; }
+.btn.small { min-height: 34px; padding: 0 10px; font-size: 11px; }
 
 .live-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--live); }
 .live-badge.small { font-size: 11.5px; }
@@ -256,6 +278,7 @@ input:hover, select:hover { border-color: var(--faint); }
   background: rgba(21, 26, 36, 0.82); border: 0; border-radius: 8px; color: var(--text);
 }
 .tile-btn:hover { background: var(--raised); }
+.tile-btn:disabled { opacity: .45; cursor: default; }
 
 .vol { display: flex; align-items: center; gap: 4px; }
 .tile:not(.has-audio) .vol { display: none; }
@@ -371,6 +394,7 @@ dialog::backdrop { background: rgba(8, 10, 16, 0.72); }
 @media (max-width: 560px) {
   #join-form { grid-template-columns: 1fr; }
   .lobby-note { font-size: 8px; }
+  #recent-room-list { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
